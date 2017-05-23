@@ -1,0 +1,271 @@
+<?php
+/**
+ * @file
+ * Code for the Lndr module
+ */
+
+define('LNDR_BASE', 'http://alpha.makehero.co/');
+define('LNDR_BASE_PUBLISHED', 'http://published.makehero.co/');
+define('LNDR_API_GET_PROJECT', 'http://alpha.makehero.co/api/v1/projects');
+
+/**
+ * Implements hook_menu
+ */
+function lndr_menu() {
+
+  $items['admin/config/content/lndr'] = array(
+    'title' => 'Lndr: Landing Page Builder',
+    'description' => 'Manage configuration for lndr',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('lndr_admin_settings'),
+    'access arguments' => array('administer nodes'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'lndr.admin.inc',
+  );
+
+  // Links for URL validation and API method
+  $items['lndr/%'] = array(
+    'title' => 'Lndr page',
+    'page callback' => 'lndr_page_redirect',
+    'page arguments' => array(1),
+    'access arguments' => array('administer nodes'),
+    'type' => MENU_CALLBACK,
+  );
+
+  // Drupal API to check URL availability
+  $items['service/lndr/check_url'] = array(
+    'title' => 'Check URI availability',
+    'page callback' => 'lndr_check_url',
+    'access arguments' => array('administer nodes'),
+    'type' => MENU_CALLBACK,
+    'file' => 'lndr.admin.inc',
+  );
+
+  // Links for development testing
+  $items['examples/lndr'] = array(
+    'title' => 'Test Lndr pages',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('lndr_example'),
+    'access arguments' => array('administer nodes'),
+    'type' => MENU_CALLBACK,
+    'file' => 'lndr.example.inc',
+  );
+
+  $items['examples/lndr/render'] = array(
+    'title' => 'Test Lndr pages',
+    'page callback' => 'lndr_example_render',
+    'access arguments' => array('administer nodes'),
+    'type' => MENU_CALLBACK,
+    'file' => 'lndr.example.inc',
+  );
+
+  return $items;
+}
+
+
+function _lndr_sync_content() {
+  // Get the API token
+  $api_token = variable_get('lndr_token', '');
+  if ($api_token === '') {
+    return;
+  }
+  // Let's reach out to Lndr to get list of contents
+  // $results = drupal_http_request(LNDR_API_GET_PROJECT, array('headers' => array('token' => $api_token,)));
+
+  // Testing, using dummy URI as request
+  $result = drupal_http_request('http://localhost:8888/temp/lndr_test.json', array('headers' => array('token' => $api_token,)));
+
+  // @todo: bad token should be a 403, not 200, implement on Lndr
+  if ($result->code !== '200') {
+    $message = 'Drupal was unable to create the page with code: %code and error: %error';
+    $variables = array(
+      '%code' => $result->code,
+      '%error' => $result->error,
+    );
+    watchdog('lndr', $message, $variables, WATCHDOG_WARNING, 'admin/config/content/lndr');
+    // @todo: is there another persistent way to add a message to alert admins about this, ideally add a message like there's a security updates.
+    return;
+  }
+  $data = json_decode($result->data, true);
+  if (!$data || empty($data)) {
+    return;
+  }
+  $data = $data['projects'];
+
+  // 1. Go through the list and only care about items that are published to this domain
+  // 3. (Separate cron?), something in Drupal but no longer on Lndr, let's delete it in Drupal.
+  global $base_url;
+  $drupal_pages = array();
+  foreach ($data as $project) {
+    if (strstr($project['publish_url'], $base_url)) {
+      $drupal_pages[] = $project;
+    }
+  }
+  // Nothing to process
+  if (empty($drupal_pages)) {
+    return;
+  }
+
+//  // 2. Check if that alias is already created in Drupal
+//  foreach ($drupal_pages as $page) {
+//    $path = substr($page['publish_url'], strlen($base_url));
+//    $path = ltrim($path, '/');
+//    $existing_alias = path_load(array('alias' => $path));
+//
+//    if (!empty($existing_alias)) {
+//       if ($existing_alias['source'] == 'lndr/' . $page['id']) {
+//
+//       }
+//    }
+//    else {
+//      // There is no URL alias found in Drupal, no alias reservation
+//      // For example, updating Lndr page changed the destination URL?
+//      // @todo: look up all of the node to see if there's one matching project id, etc.
+//    }
+//  }
+}
+
+/**
+ * Check whether a path alias is available, if it is, reserve it for Lndr
+ */
+function lndr_check_url() {
+  // Check if the request has the appropriate API token in the header
+  $headers = getallheaders();
+  if (!array_key_exists('Token', $headers)) {
+    // no token exist
+    $response = array(
+      'error' => 1,
+      'message' => t('No token in the request header'),
+    );
+    print json_encode($response);
+    return;
+  }
+  $api_token = variable_get('lndr_token', '');
+  if ($api_token === '') {
+    // no token set in Drupal yet
+    $response = array(
+      'error' => 1,
+      'message' => t('No token configured in Drupal'),
+    );
+    print json_encode($response);
+    return;
+  }
+  if ($api_token !== $headers['Token']) {
+    // invalid token given
+    $response = array(
+      'error' => 1,
+      'message' => t('Invalid token given'),
+    );
+    print json_encode($response);
+    return;
+  }
+  $query = drupal_get_query_parameters();
+
+  if (!array_key_exists('path', $query)) {
+    $response = array(
+      'error' => 1,
+      'message' => t('Required parameter path not given'),
+    );
+    print json_encode($response);
+    return;
+  }
+
+  // 1. Let's check to see if the path is available in the system (Assuming path validation is done on Lndr side)
+  $path = rtrim($query['path'], '/');
+  $existing_alias = path_load(array('alias' => $path));
+  if (!empty($existing_alias)) {
+    $response = array(
+      'error' => 1,
+      'message' => t('The URL path is not available'),
+    );
+    print json_encode($response);
+    return;
+  } else {
+    // create a new Drupal alias under lndr/[project_id]
+    $path = array(
+      'source' => 'lndr/reserved',
+      'alias' => $path,
+    );
+    path_save($path);
+    global $base_url;
+    $response = array(
+      'error' => 0,
+      'message' => t('Path is available and successfully reserved at @url', array('@url' => $base_url . $path)),
+    );
+    print json_encode($response);
+    return;
+  }
+}
+
+/**
+ * Internal menu path to handle lndr page stubs
+ * @param $page_id
+ */
+function lndr_page_redirect($page_id) {
+  drupal_goto(LNDR_BASE . 'projects/' . $page_id);
+}
+
+
+
+/**
+ * Import a page from lndr for rendering in Drupal
+ * @param $url
+ */
+function _lndr_import_page($url) {
+
+  $result = drupal_http_request($url);
+  // error with fetching the url
+  if ($result->code != '200') {
+    $message = 'Lndr was unable to fetch the url: %url with code: %code and error: %error';
+    $variables = array(
+      '%url' => $url,
+      '%code' => $result->code,
+      '%error' => $result->error,
+    );
+    watchdog('lndr', $message, $variables, WATCHDOG_WARNING, 'node');
+    $error = t('Unable to fetch the url given, please check the logs for more details');
+    return array(
+      'error' => 1,
+      'message' => $error,
+    );
+  }
+
+  // Start to parse the content
+  module_load_include('inc', 'lndr', 'simple_html_dom');
+  $html = str_get_html($result->data);
+
+  // prepend the url of the page to all of the images
+  foreach($html->find('img') as $key => $element) {
+    $src= $element->src;
+    $html->find('img', $key)->src = $url . $src;
+  }
+
+  // prepend url to stylesheet, assuming we only have one stylesheet so far
+  $html->find('link[rel="stylesheet"]', 0)->href = $url . $html->find('link[rel="stylesheet"]', 0)->href;
+
+  // prepend javascripts
+  foreach($html->find('script') as $key => $element) {
+    $src = $element->src;
+    if (isset($src)) {
+      $html->find('script', $key)->src = $url . $src;
+    }
+  }
+
+  // prepend all of the div blocks that have background images
+  $div_classes = array(
+    'large-block',
+    'small-block',
+    'image',
+    'image-slide',
+  );
+
+  foreach($div_classes as $class) {
+    foreach ($html->find('div[class="' . $class . '"]') as $key => $div) {
+       $bg_image = $div->{'data-background-image'};
+       if (isset($bg_image)) {
+         $html->find('div[class="' . $class . '"]', $key)->{'data-background-image'} = $url . $bg_image;
+       }
+    }
+  }
+  print $html;
+}
