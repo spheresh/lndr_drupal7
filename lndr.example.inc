@@ -64,3 +64,12 @@ function lndr_example_render() {
   }
   print _lndr_import_page($query['url']);
 }
+
+/**
+ * emulate the lndr web service call
+ */
+function lndr_example_service() {
+  $path = drupal_get_path('module', 'lndr') . '/lndr_test.json';
+  $data = file_get_contents($path);
+  print $data;
+}

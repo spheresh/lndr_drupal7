@@ -4,3 +4,4 @@ core = 7.x
 package = Others
 version = 7.x-1.0
 configure = admin/config/content/lndr
+dependencies[] = path

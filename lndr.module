@@ -26,9 +26,9 @@ function lndr_menu() {
   // Links for URL validation and API method
   $items['lndr/%'] = array(
     'title' => 'Lndr page',
-    'page callback' => 'lndr_page_redirect',
+    'page callback' => 'lndr_page_display',
     'page arguments' => array(1),
-    'access arguments' => array('administer nodes'),
+    'access arguments' => array('access content'),
     'type' => MENU_CALLBACK,
   );
 
@@ -38,7 +38,6 @@ function lndr_menu() {
     'page callback' => 'lndr_check_url',
     'access arguments' => array('administer nodes'),
     'type' => MENU_CALLBACK,
-    'file' => 'lndr.admin.inc',
   );
 
   // Links for development testing
@@ -59,21 +58,44 @@ function lndr_menu() {
     'file' => 'lndr.example.inc',
   );
 
+  $items['examples/lndr/service'] = array(
+    'title' => 'Test Lndr service',
+    'page callback' => 'lndr_example_service',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'file' => 'lndr.example.inc',
+  );
+
   return $items;
 }
 
+/**
+ * Implements hook_cron
+ * This allow us to refactor code later to make it able to process more items
+ */
+function lndr_cron() {
+  // @todo: later let's use cron queue
+  lndr_sync_path();
+}
 
-function _lndr_sync_content() {
+/**
+ * Syncing the url alias from Lndr.
+ */
+function lndr_sync_path() {
   // Get the API token
   $api_token = variable_get('lndr_token', '');
   if ($api_token === '') {
     return;
   }
-  // Let's reach out to Lndr to get list of contents
-  // $results = drupal_http_request(LNDR_API_GET_PROJECT, array('headers' => array('token' => $api_token,)));
 
-  // Testing, using dummy URI as request
-  $result = drupal_http_request('http://localhost:8888/temp/lndr_test.json', array('headers' => array('token' => $api_token,)));
+  if (variable_get('lndr_debug_mode', 0) === 1) {
+    // Testing, using dummy URI as request
+    global $base_url;
+    $result = drupal_http_request($base_url . '/examples/lndr/service', array('headers' => array('token' => $api_token,)));
+  } else {
+    // Let's reach out to Lndr to get list of contents
+    $result = drupal_http_request(LNDR_API_GET_PROJECT, array('headers' => array('token' => $api_token,)));
+  }
 
   // @todo: bad token should be a 403, not 200, implement on Lndr
   if ($result->code !== '200') {
@@ -92,11 +114,21 @@ function _lndr_sync_content() {
   }
   $data = $data['projects'];
 
-  // 1. Go through the list and only care about items that are published to this domain
-  // 3. (Separate cron?), something in Drupal but no longer on Lndr, let's delete it in Drupal.
+  // Create or update alias in Drupal
+  _lndr_upsert_alias($data);
+
+  // Remove alias in Drupal (when page is deleted or published to other domains)
+  _lndr_remove_alias($data);
+}
+
+/**
+ * Create or update alias in Drupal for Lndr pages
+ * @param $projects
+ */
+function _lndr_upsert_alias($projects) {
   global $base_url;
   $drupal_pages = array();
-  foreach ($data as $project) {
+  foreach ($projects as $project) {
     if (strstr($project['publish_url'], $base_url)) {
       $drupal_pages[] = $project;
     }
@@ -105,24 +137,101 @@ function _lndr_sync_content() {
   if (empty($drupal_pages)) {
     return;
   }
+  // Going through all the pages that are published to this URL
+  foreach ($drupal_pages as $page) {
+    $path = substr($page['publish_url'], strlen($base_url));
+    $path = ltrim($path, '/');
 
-//  // 2. Check if that alias is already created in Drupal
-//  foreach ($drupal_pages as $page) {
-//    $path = substr($page['publish_url'], strlen($base_url));
-//    $path = ltrim($path, '/');
-//    $existing_alias = path_load(array('alias' => $path));
-//
-//    if (!empty($existing_alias)) {
-//       if ($existing_alias['source'] == 'lndr/' . $page['id']) {
-//
-//       }
-//    }
-//    else {
-//      // There is no URL alias found in Drupal, no alias reservation
-//      // For example, updating Lndr page changed the destination URL?
-//      // @todo: look up all of the node to see if there's one matching project id, etc.
-//    }
-//  }
+    $existing_alias_by_alias = path_load(array('alias' => $path));
+    if (!empty($existing_alias_by_alias)) {
+      // case 1. this alias was reserved for this page, update it
+      if ($existing_alias_by_alias['source'] === 'lndr/reserved') {
+        $existing_alias_by_alias['source'] = 'lndr/' . $page['id'];
+        $existing_alias_by_alias['alias'] = $path;
+        path_save($existing_alias_by_alias);
+      }
+    }
+    else
+    {
+      // case 3. let's see if a previous alias is stored, but we updated to a new one from Lndr
+      $existing_alias_by_source = path_load(array('source' => 'lndr/' . $page['id']));
+      if (!empty($existing_alias_by_source)) {
+        // Making sure that it is still on the same domain
+        if (substr($page['publish_url'], 0, strlen($base_url)) === $base_url) {
+          $_path = ltrim(substr($page['publish_url'], strlen($base_url)), '/');
+          if ($_path !== $existing_alias_by_source['alias']) {
+            $existing_alias_by_source['alias'] = $_path;
+            path_save($existing_alias_by_source);
+          }
+        }
+      }
+      else
+      {
+        // case 2. No Drupal alias exist at all, change from some other URL to Drupal domain URL
+        $new_path = array(
+          'source' => 'lndr/' . $page['id'],
+          'alias' => $path,
+        );
+        path_save($new_path);
+      }
+    }
+  }
+}
+
+/**
+ * Remove alias in Drupal no longer published to by Lndr
+ * @param $projects
+ */
+function _lndr_remove_alias($projects) {
+
+  global $base_url;
+
+  // Re-format the projects a bit to give them keys as project id
+  $_projects = array();
+  foreach ($projects as $project) {
+    $_projects[$project['id']] = $project;
+  }
+
+  // Get all alias lndr uses (lndr/[project_id])
+  $existing_alias = _lndr_load_alias();
+  if (empty($existing_alias)) {
+    return;
+  }
+
+  foreach ($existing_alias as $project_id => $alias) {
+    // Case 5. Remove any local path not presented in the web service
+    if (!array_key_exists($project_id, $_projects)) {
+      path_delete($alias['pid']);
+    }
+    else
+    {
+    // Case 4. There is a local alias, however, remotely it has been changed to something not in this Domain
+      if (substr($_projects[$project_id]['publish_url'], 0, strlen($base_url)) !== $base_url) {
+        path_delete($alias['pid']);
+      }
+    }
+  }
+}
+
+/**
+ * Helper function that loads all of the URL alias that has a source of lndr/%
+ * @return array
+ */
+function _lndr_load_alias() {
+  $data = array();
+  $query = db_select('url_alias', 'u')
+    ->fields('u', array('pid', 'source', 'alias'))
+    ->condition('u.source', 'lndr/%%', 'LIKE');
+
+  $results = $query->execute();
+  foreach ($results as $result) {
+    // extract the lndr project id
+    $path = explode('/', $result->source);
+    if (is_numeric($path[1])) {
+      $data[$path[1]] = (array) $result;
+    }
+  }
+  return $data;
 }
 
 /**
@@ -181,7 +290,7 @@ function lndr_check_url() {
     print json_encode($response);
     return;
   } else {
-    // create a new Drupal alias under lndr/[project_id]
+    // reserve the url
     $path = array(
       'source' => 'lndr/reserved',
       'alias' => $path,
@@ -201,11 +310,11 @@ function lndr_check_url() {
  * Internal menu path to handle lndr page stubs
  * @param $page_id
  */
-function lndr_page_redirect($page_id) {
-  drupal_goto(LNDR_BASE . 'projects/' . $page_id);
+function lndr_page_display($page_id) {
+  // Lndr actually does a 302 redirect from this URL but drupal_Http_request handles it fine
+  $internal_url = LNDR_BASE . 'projects/' . $page_id;
+  _lndr_import_page($internal_url);
 }
-
-
 
 /**
  * Import a page from lndr for rendering in Drupal

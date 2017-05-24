@@ -19,6 +19,13 @@ function lndr_admin_settings($form, &$form_state) {
     '#description'   => t("Your Lndr account API token, you can find this information under your user profile in Lndr"),
   );
 
+  $form['lndr_debug_mode'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Developer mode'),
+    '#default_value' => variable_get('lndr_debug_mode', 0),
+    '#description' => t('Turn this on to test Lndr API data from local source instead of executing real API call'),
+  );
+
   return system_settings_form($form);
 }
 
