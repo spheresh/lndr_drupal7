@@ -11,7 +11,6 @@
  */
 function lndr_admin_settings($form, &$form_state) {
 
-  // @todo: we probably also want to provide a way for user to test their settings
   $form['lndr_token'] = array(
     '#type' => 'textfield',
     '#title' => t('API token'),
@@ -34,4 +33,5 @@ function lndr_admin_settings($form, &$form_state) {
  */
 function lndr_admin_settings_validate($form, &$form_state) {
   // It be better if Lndr can validate the API token
+  // @todo: implement the validate token method from Lndr 
 }

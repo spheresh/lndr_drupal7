@@ -6,7 +6,8 @@
 
 define('LNDR_BASE', 'http://alpha.makehero.co/');
 define('LNDR_BASE_PUBLISHED', 'http://published.makehero.co/');
-define('LNDR_API_GET_PROJECT', 'http://alpha.makehero.co/api/v1/projects');
+define('LNDR_API_GET_PROJECT', 'http://alpha.makehero.co/v1/projects');
+define('LNDR_API_VALIDATE_TOKEN', 'http://alpha.makehero.co/v1/validate_token');
 
 /**
  * Implements hook_menu
