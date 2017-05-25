@@ -1,0 +1,15 @@
+<?php
+/**
+ * @file
+ * Code for the Lndr module
+ */
+
+/**
+ * Implements hook_uninstall
+ */
+function lndr_uninstall() {
+  // Remove all of the variable set by this module
+  variable_del('lndr_token');
+  variable_del('lndr_debug_mode');
+  variable_del('lndr_api_info');
+}

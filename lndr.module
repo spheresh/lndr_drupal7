@@ -37,7 +37,7 @@ function lndr_menu() {
   $items['service/lndr/check_url'] = array(
     'title' => 'Check URI availability',
     'page callback' => 'lndr_check_url',
-    'access arguments' => array('administer nodes'),
+    'access arguments' => array('access content'),
     'type' => MENU_CALLBACK,
   );
 
@@ -76,6 +76,7 @@ function lndr_menu() {
  */
 function lndr_cron() {
   // @todo: later let's use cron queue
+  // @todo: is there any possibility reserved path become orphaned that needs clean up
   lndr_sync_path();
 }
 
@@ -95,10 +96,16 @@ function lndr_sync_path() {
     $result = drupal_http_request($base_url . '/examples/lndr/service', array('headers' => array('token' => $api_token,)));
   } else {
     // Let's reach out to Lndr to get list of contents
-    $result = drupal_http_request(LNDR_API_GET_PROJECT, array('headers' => array('token' => $api_token,)));
+    $options = array(
+      'method' => 'GET',
+      'headers' => array(
+        'Authorization' => 'Token token=' . $api_token,
+      ),
+    );
+    $result = drupal_http_request(LNDR_API_GET_PROJECT, $options);
   }
 
-  // @todo: bad token should be a 403, not 200, implement on Lndr
+  // @todo: bad token should be a 403 with message, not 500, implement on Lndr
   if ($result->code !== '200') {
     $message = 'Drupal was unable to create the page with code: %code and error: %error';
     $variables = array(
@@ -241,7 +248,8 @@ function _lndr_load_alias() {
 function lndr_check_url() {
   // Check if the request has the appropriate API token in the header
   $headers = getallheaders();
-  if (!array_key_exists('Token', $headers)) {
+
+  if (!array_key_exists('Authorization', $headers)) {
     // no token exist
     $response = array(
       'error' => 1,
@@ -255,12 +263,14 @@ function lndr_check_url() {
     // no token set in Drupal yet
     $response = array(
       'error' => 1,
-      'message' => t('No token configured in Drupal'),
+      'message' => t('No API token configured in Drupal'),
     );
     print json_encode($response);
     return;
   }
-  if ($api_token !== $headers['Token']) {
+
+  $authorization = str_replace('Token token=', '', $headers['Authorization']);
+  if ($api_token !== $authorization) {
     // invalid token given
     $response = array(
       'error' => 1,
@@ -297,10 +307,9 @@ function lndr_check_url() {
       'alias' => $path,
     );
     path_save($path);
-    global $base_url;
     $response = array(
       'error' => 0,
-      'message' => t('Path is available and successfully reserved at @url', array('@url' => $base_url . $path)),
+      'message' => t('Path is available and successfully reserved'),
     );
     print json_encode($response);
     return;
@@ -338,6 +347,13 @@ function _lndr_import_page($url) {
       'error' => 1,
       'message' => $error,
     );
+  }
+
+  // Lndr issues a redirect from projects/project_id to actual page where resource is
+  if (property_exists($result, 'redirect_code')) {
+    if ($result->redirect_code === '302') {
+      $url = $result->redirect_url;
+    }
   }
 
   // Start to parse the content
