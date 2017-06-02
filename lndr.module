@@ -4,10 +4,20 @@
  * Code for the Lndr module
  */
 
+define('LNDR_DEV', 'herolander.dev');
 define('LNDR_BASE', 'http://alpha.makehero.co/');
 define('LNDR_BASE_PUBLISHED', 'http://published.makehero.co/');
 define('LNDR_API_GET_PROJECT', 'http://alpha.makehero.co/v1/projects');
 define('LNDR_API_VALIDATE_TOKEN', 'http://alpha.makehero.co/v1/validate_token');
+
+/**
+ * Implements hook_init
+ * Enable cross-domain request for the API path
+ */
+function lndr_init() {
+  drupal_add_http_header('Access-Control-Allow-Origin', LNDR_BASE, TRUE);
+  drupal_add_http_header('Access-Control-Allow-Origin', LNDR_DEV, TRUE);
+}
 
 /**
  * Implements hook_menu
