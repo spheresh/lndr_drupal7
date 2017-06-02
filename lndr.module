@@ -34,9 +34,17 @@ function lndr_menu() {
   );
 
   // Drupal API to check URL availability
-  $items['service/lndr/check_url'] = array(
+  $items['service/lndr/validate_path'] = array(
     'title' => 'Check URI availability',
-    'page callback' => 'lndr_check_url',
+    'page callback' => 'lndr_validate_path',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+  // Drupal API to reserve URL/path
+  $items['service/lndr/reserve_path'] = array(
+    'title' => 'Check URI availability',
+    'page callback' => 'lndr_reserve_path',
     'access arguments' => array('access content'),
     'type' => MENU_CALLBACK,
   );
@@ -261,75 +269,144 @@ function _lndr_load_alias() {
 /**
  * Check whether a path alias is available, if it is, reserve it for Lndr
  */
-function lndr_check_url() {
+function lndr_validate_path() {
+
+  $response = _lndr_service_base();
+  // If token doesn't check out or others, we exit
+  if ($response['response']['type'] === 'error') {
+    print json_encode($response);
+    return;
+  }
+
+  // Query array is stored in response message if everything is fine
+  $query = $response['response']['message'];
+
+  // 1. Let's check to see if the path is available in the system (Assuming path validation is done on Lndr side)
+  $path = rtrim($query['path'], '/');
+  $existing_alias = path_load(array('alias' => $path));
+  if (empty($existing_alias)) {
+    $response = array(
+      'response' => array(
+        'type' => 'path_valid',
+        'message' => 'The chosen path is available',
+        'code' => '200',
+      ),
+    );
+    print json_encode($response);
+    return;
+  }
+  else {
+    $response = array(
+      'response' => array(
+        'type' => 'path_taken',
+        'message' => 'The requested path is not available for Lndr',
+        'code' => '403',
+      ),
+    );
+    print json_encode($response);
+    return;
+  }
+}
+
+/**
+ * Reserve an URL alias in Drupal internally
+ */
+function lndr_reserve_path() {
+  $response = _lndr_service_base();
+  // If token doesn't check out or others, we exit
+  if ($response['response']['type'] === 'error') {
+    print json_encode($response);
+    return;
+  }
+  // Query array is stored in response message if everything is fine
+  $query = $response['response']['message'];
+
+  $path = rtrim($query['path'], '/');
+  $path = array(
+    'source' => 'lndr/reserved',
+    'alias' => $path,
+  );
+  path_save($path);
+
+  $response = array(
+    'response' => array(
+      'type' => 'path_valid',
+      'message' => 'The path has been successfully reserved',
+      'code' => '200',
+    ),
+  );
+  print json_encode($response);
+  return;
+}
+
+/**
+ * Helper to check incoming token and others for
+ * path checking and reservation
+ *
+ * @return array
+ */
+function _lndr_service_base() {
+
   // Check if the request has the appropriate API token in the header
   $headers = getallheaders();
 
   if (!array_key_exists('Authorization', $headers)) {
     // no token exist
     $response = array(
-      'error' => 1,
-      'message' => t('No token in the request header'),
+      'response' => array(
+        'type' => 'error',
+        'message' => t('No token in the request header'),
+        'code' => '403',
+      ),
     );
-    print json_encode($response);
-    return;
+    return $response;
   }
   $api_token = variable_get('lndr_token', '');
   if ($api_token === '') {
     // no token set in Drupal yet
     $response = array(
-      'error' => 1,
-      'message' => t('No API token configured in Drupal'),
+      'response' => array(
+        'type' => 'error',
+        'message' => t('No API token configured in Drupal'),
+        'code' => '403',
+      ),
     );
-    print json_encode($response);
-    return;
+    return $response;
   }
 
   $authorization = str_replace('Token token=', '', $headers['Authorization']);
   if ($api_token !== $authorization) {
     // invalid token given
     $response = array(
-      'error' => 1,
-      'message' => t('Invalid token given'),
+      'response' => array(
+        'type' => 'error',
+        'message' => t('Invalid token given'),
+        'code' => '403',
+      ),
     );
-    print json_encode($response);
-    return;
+    return $response;
   }
   $query = drupal_get_query_parameters();
-
   if (!array_key_exists('path', $query)) {
     $response = array(
-      'error' => 1,
-      'message' => t('Required parameter path not given'),
+      'response' => array(
+        'type' => 'error',
+        'message' => t('Required parameter path not given'),
+        'code' => '403',
+      ),
     );
-    print json_encode($response);
-    return;
+    return $response;
   }
 
-  // 1. Let's check to see if the path is available in the system (Assuming path validation is done on Lndr side)
-  $path = rtrim($query['path'], '/');
-  $existing_alias = path_load(array('alias' => $path));
-  if (!empty($existing_alias)) {
-    $response = array(
-      'error' => 1,
-      'message' => t('The URL path is not available'),
-    );
-    print json_encode($response);
-    return;
-  } else {
-    // reserve the url
-    $path = array(
-      'source' => 'lndr/reserved',
-      'alias' => $path,
-    );
-    path_save($path);
-    $response = array(
-      'error' => 0,
-      'message' => t('Path is available and successfully reserved'),
-    );
-    print json_encode($response);
-    return;
-  }
+  // if everything checks out, we just pass the query back
+  $response = array(
+    'response' => array(
+      'type' => 'status',
+      'message' => $query,
+      'code' => '200',
+    ),
+  );
+  return $response;
 }
 
 /**
