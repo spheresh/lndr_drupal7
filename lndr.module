@@ -15,8 +15,6 @@ define('LNDR_API_VALIDATE_TOKEN', 'http://alpha.makehero.co/v1/validate_token');
  * Enable cross-domain request for the API path
  */
 function lndr_init() {
-  drupal_add_http_header('Access-Control-Allow-Origin', LNDR_BASE, TRUE);
-  drupal_add_http_header('Access-Control-Allow-Origin', LNDR_DEV, TRUE);
 }
 
 /**
