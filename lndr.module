@@ -15,6 +15,25 @@ define('LNDR_API_VALIDATE_TOKEN', 'http://alpha.makehero.co/v1/validate_token');
  * Enable cross-domain request for the API path
  */
 function lndr_init() {
+
+  // Only add the CORS header to our service path for security
+  $current_path = drupal_strtolower(drupal_get_path_alias($_GET['q']));
+  $page_match = drupal_match_path($current_path, 'service/lndr/*');
+  if ($current_path != $_GET['q']) {
+    $page_match = $page_match || drupal_match_path($_GET['q'], 'service/lndr/*');
+  }
+  if ($page_match) {
+    // Let's add our CORS headers
+    $headers = array(
+      'Access-Control-Allow-Origin' => '*',
+      'Access-Control-Allow-Credentials' => true,
+      'Access-Control-Allow-Methods' => 'GET, POST',
+      'Access-Control-Allow-Headers' => 'Authorization',
+    );
+    foreach ($headers as $header => $value) {
+      drupal_add_http_header($header, $value, TRUE);
+    }
+  }
 }
 
 /**
