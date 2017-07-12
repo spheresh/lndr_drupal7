@@ -4,11 +4,10 @@
  * Code for the Lndr module
  */
 
-define('LNDR_DEV', 'herolander.dev');
-define('LNDR_BASE', 'http://alpha.makehero.co/');
-define('LNDR_BASE_PUBLISHED', 'http://published.makehero.co/');
-define('LNDR_API_GET_PROJECT', 'http://alpha.makehero.co/v1/projects');
-define('LNDR_API_VALIDATE_TOKEN', 'http://alpha.makehero.co/v1/validate_token');
+define('LNDR_BASE', 'http://www.lndr.co/');
+define('LNDR_BASE_PUBLISHED', 'http://p.lndr.co/');
+define('LNDR_API_GET_PROJECT', 'http://www.lndr.co/v1/projects');
+define('LNDR_API_VALIDATE_TOKEN', 'http://www.lndr.co/v1/validate_token');
 
 /**
  * Implements hook_init
