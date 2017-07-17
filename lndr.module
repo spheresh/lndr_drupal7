@@ -4,10 +4,10 @@
  * Code for the Lndr module
  */
 
-define('LNDR_BASE', 'http://www.lndr.co/');
-define('LNDR_BASE_PUBLISHED', 'http://p.lndr.co/');
-define('LNDR_API_GET_PROJECT', 'http://www.lndr.co/v1/projects');
-define('LNDR_API_VALIDATE_TOKEN', 'http://www.lndr.co/v1/validate_token');
+define('LNDR_BASE', 'https://www.lndr.co/');
+define('LNDR_BASE_PUBLISHED', 'https://p.lndr.co/');
+define('LNDR_API_GET_PROJECT', 'https://www.lndr.co/v1/projects');
+define('LNDR_API_VALIDATE_TOKEN', 'https://www.lndr.co/v1/validate_token');
 
 /**
  * Implements hook_init
