@@ -76,6 +76,14 @@ function lndr_menu() {
     'type' => MENU_CALLBACK,
   );
 
+  // Drupal API to sync contents from Lndr
+  $items['service/lndr/sync_content'] = array(
+    'title' => 'Sync Lndr pages',
+    'page callback' => 'lndr_sync_content',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
   // Links for development testing
   $items['examples/lndr'] = array(
     'title' => 'Test Lndr pages',
@@ -376,12 +384,37 @@ function lndr_reserve_path() {
 }
 
 /**
+ * Sync contents published/deleted from Lndr
+ */
+function lndr_sync_content() {
+  $response = _lndr_service_base(FALSE);
+  // If token doesn't check out or other issues, we exit
+  if ($response['response']['type'] === 'error') {
+    print json_encode($response);
+    return;
+  }
+  // Same as when we run cron
+  lndr_sync_path();
+  $response = array(
+    'response' => array(
+      'type' => 'content_synced',
+      'message' => 'Content successfully synced',
+      'code' => '200',
+    ),
+  );
+  print json_encode($response);
+  return;
+}
+
+/**
  * Helper to check incoming token and others for
  * path checking and reservation
  *
+ * @param bool
+ *
  * @return array
  */
-function _lndr_service_base() {
+function _lndr_service_base($check_path = TRUE) {
 
   // Check if the request has the appropriate API token in the header
   $headers = getallheaders();
@@ -422,16 +455,19 @@ function _lndr_service_base() {
     );
     return $response;
   }
+
   $query = drupal_get_query_parameters();
-  if (!array_key_exists('path', $query)) {
-    $response = array(
-      'response' => array(
-        'type' => 'error',
-        'message' => t('Required parameter path not given'),
-        'code' => '403',
-      ),
-    );
-    return $response;
+  if ($check_path === TRUE) {
+    if (!array_key_exists('path', $query)) {
+      $response = array(
+        'response' => array(
+          'type' => 'error',
+          'message' => t('Required parameter path not given'),
+          'code' => '403',
+        ),
+      );
+      return $response;
+    }
   }
 
   // if everything checks out, we just pass the query back
@@ -458,6 +494,8 @@ function lndr_page_display($page_id) {
 /**
  * Import a page from lndr for rendering in Drupal
  * @param $url
+ *
+ * @return array
  */
 function _lndr_import_page($url) {
 
