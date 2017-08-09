@@ -407,6 +407,26 @@ function lndr_sync_content() {
 }
 
 /**
+ * Workaround to find Authorization header in additional places for some server setups
+ * @return mixed
+ */
+function _lndr_getallheaders() {
+  // Get all headers
+  $headers = getallheaders();
+  // Workaround if somehow the authorization header is not here
+  if (!array_key_exists('Authorization', $headers)) {
+    if (array_key_exists('Authorization', $_SERVER)) {
+     $headers['Authorization'] = $_SERVER['Authorization'];
+    } else {
+      if (array_key_exists('REDIRECT_HTTP_AUTHORIZATION', $_SERVER)) {
+        $headers['Authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+      }
+    }
+  }
+  return $headers;
+}
+
+/**
  * Helper to check incoming token and others for
  * path checking and reservation
  *
@@ -417,7 +437,7 @@ function lndr_sync_content() {
 function _lndr_service_base($check_path = TRUE) {
 
   // Check if the request has the appropriate API token in the header
-  $headers = getallheaders();
+  $headers = _lndr_getallheaders();
 
   if (!array_key_exists('Authorization', $headers)) {
     // no token exist
