@@ -657,7 +657,7 @@ function lndr_page_display($page_id) {
     // When users hit the my_campaign -> lndr/reserved path, let's actually run the sync process
     // This way we can deploy this page faster, we can also check if this path reservation is orphaned
     $alias = drupal_get_path_alias();
-    drupal_goto('lndr_sync?path=' . $alias);
+    drupal_goto('lndr_sync', ['query' => ['path' => $alias]]);
   }
   // Lndr actually does a 302 redirect from this URL but drupal_Http_request handles it fine
   $internal_url = LNDR_BASE . 'projects/' . $page_id;
