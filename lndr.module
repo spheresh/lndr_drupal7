@@ -93,6 +93,14 @@ function lndr_menu() {
     'type' => MENU_CALLBACK,
   );
 
+  // Links for URL validation and API method
+  $items['lndr_sync'] = array(
+    'title' => 'Deploying Lndr page',
+    'page callback' => 'lndr_sync',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
   // Drupal API to check URL availability
   $items['service/lndr/validate_path'] = array(
     'title' => 'Check URI availability',
@@ -178,6 +186,107 @@ if (!function_exists('getallheaders')) {
       }
     }
     return $headers;
+  }
+}
+
+/**
+ * Manually process all of the path syncing
+ * @return mixed
+ */
+function lndr_sync() {
+  $path = '';
+  if (isset($_GET['path'])) {
+    // Sanitize $_GET['path']
+    $path = check_plain($_GET['path']);
+  }
+  $function = 'lndr_sync_batch';
+  $batch = $function($path);
+  batch_set($batch);
+
+  return batch_process('');
+}
+
+/**
+ * In Drupal 7, this is the a separate batch command where we
+ * iterate through the number of operations
+ * @param $path
+ * @return array
+ */
+function lndr_sync_batch($path) {
+  // @todo: This is not true batch yet as we only process one
+  $ids = array(1);
+  $num_operations = 1;
+  drupal_set_message('Deploy lndr pages...');
+  $operations = array();
+  for ($i = 0; $i < $num_operations; $i++) {
+    $operations[] = array(
+      'lndr_sync_batch_op',
+      array(
+        $ids[$i],
+        $path,
+      ),
+    );
+  }
+  $batch = array(
+    'operations' => $operations,
+    'finished' => 'lndr_sync_batch_finished',
+  );
+  return $batch;
+}
+
+/**
+ * The actual batch operation where we sync the path
+ * @param $id
+ * @param $path
+ * @param $context
+ */
+function lndr_sync_batch_op($id, $path, &$context) {
+  lndr_sync_path();
+  // If we run this process with a $path passed in, it means it comes from a
+  // /lndr/reserved => /somepage
+  if ($path != '') {
+    // We check after running the sync, if that path has been updated from reserved to actual lndr page id
+    // Which means it has been published
+    $url_alias = path_load(['alias' => $path]);
+    if (!empty($url_alias)) {
+      // We flag it and send it to the finishing process for proper redirect.
+      if ($url_alias['source'] != '/lndr/reserved') {
+        $context['results']['path_updated'] = $path;
+      }
+    }
+  }
+  // $context['message'] = t('some message here');
+}
+
+/**
+ * Batch operation finishing callback.
+ * @param $success
+ * @param $results
+ * @param $operations
+ */
+function lndr_sync_batch_finished($success, $results, $operations) {
+  if ($success) {
+    drupal_set_message(t('Finished deploying Lndr pages.'));
+    // If we were sent from a placeholder (/lndr/reserved => path) but the page has been
+    // published, we redirect back to that alias so user can see the published page
+    if (array_key_exists('path_updated', $results)) {
+      drupal_goto($results['path_updated']);
+    } else {
+      // if not, let's go home so we don't create an infinite loop
+      drupal_goto('<front>');
+    }
+  }
+  else {
+    $error_operation = reset($operations);
+    drupal_set_message(
+      t('An error occurred while processing @operation with arguments : @args',
+        array(
+          '@operation' => $error_operation[0],
+          '@args' => print_r($error_operation[0], TRUE),
+        )
+      ),
+      'error'
+    );
   }
 }
 
@@ -539,6 +648,17 @@ function _lndr_service_base($check_path = TRUE) {
  * @param $page_id
  */
 function lndr_page_display($page_id) {
+  // If we hit a lndr path that looks like /lndr/reserved or similar
+  if (!is_numeric($page_id)) {
+    if ($page_id != 'reserved') {
+      // We will just show a standard "access denied" page in this case.
+      return MENU_ACCESS_DENIED;
+    }
+    // When users hit the my_campaign -> lndr/reserved path, let's actually run the sync process
+    // This way we can deploy this page faster, we can also check if this path reservation is orphaned
+    $alias = drupal_get_path_alias();
+    drupal_goto('lndr_sync?path=' . $alias);
+  }
   // Lndr actually does a 302 redirect from this URL but drupal_Http_request handles it fine
   $internal_url = LNDR_BASE . 'projects/' . $page_id;
   _lndr_import_page($internal_url);
