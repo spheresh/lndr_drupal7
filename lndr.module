@@ -8,6 +8,7 @@ define('LNDR_BASE', 'https://www.lndr.co/');
 define('LNDR_BASE_PUBLISHED', 'https://p.lndr.co/');
 define('LNDR_API_GET_PROJECT', 'https://www.lndr.co/v1/projects');
 define('LNDR_API_VALIDATE_TOKEN', 'https://www.lndr.co/v1/validate_token');
+define('LNDR_CT_TYPE', 'lndr_page');
 
 /**
  * Implements hook_help().
@@ -85,15 +86,6 @@ function lndr_menu() {
   );
 
   // Links for URL validation and API method
-  $items['lndr/%'] = array(
-    'title' => 'Lndr page',
-    'page callback' => 'lndr_page_display',
-    'page arguments' => array(1),
-    'access arguments' => array('access content'),
-    'type' => MENU_CALLBACK,
-  );
-
-  // Links for URL validation and API method
   $items['lndr_sync'] = array(
     'title' => 'Deploying Lndr page',
     'page callback' => 'lndr_sync',
@@ -158,10 +150,41 @@ function lndr_menu() {
     'type' => MENU_CALLBACK,
     'file' => 'lndr.example.inc',
   );
-
-
   return $items;
 }
+
+/**
+ * Implements hook_menu_alter
+ * @param $items
+ */
+function lndr_menu_alter(&$items) {
+  //@todo: not the best approach, however, sufficient for a POC
+  $items['node/%node']['page callback'] = 'lndr_custom_node_view';
+}
+
+/**
+ * Hijacking the node view for custom rendering of Lndr landing page
+ * @param $node
+ */
+function lndr_custom_node_view($node) {
+  if ($node->type == LNDR_CT_TYPE) {
+    if (empty($node->lndr_project_id)) {
+      // When user hit a page that does not have a lndr project id, we assume that
+      // the node was reserved and hasn't been updated to reflect the lndr relationship
+      // we redirect user to a manual syncing page to deploy this page
+      drupal_goto('lndr_sync', ['query' => ['nid' => $node->nid]]);
+      // return node_page_view($node);
+    } else {
+      $lang = $node->language;
+      $lndr_project_id = $node->lndr_project_id[$lang][0]['value'];
+      $internal_url = LNDR_BASE . 'projects/' . $lndr_project_id;
+      _lndr_import_page($internal_url);
+    }
+  } else {
+   return node_page_view($node);
+  }
+}
+
 
 /**
  * Implements hook_cron
@@ -194,13 +217,16 @@ if (!function_exists('getallheaders')) {
  * @return mixed
  */
 function lndr_sync() {
-  $path = '';
-  if (isset($_GET['path'])) {
+  $nid = '';
+  if (isset($_GET['nid'])) {
     // Sanitize $_GET['path']
-    $path = check_plain($_GET['path']);
+    $nid = check_plain($_GET['nid']);
+    if (!is_numeric($nid)) {
+      return MENU_ACCESS_DENIED;
+    }
   }
   $function = 'lndr_sync_batch';
-  $batch = $function($path);
+  $batch = $function($nid);
   batch_set($batch);
 
   return batch_process('');
@@ -209,10 +235,10 @@ function lndr_sync() {
 /**
  * In Drupal 7, this is the a separate batch command where we
  * iterate through the number of operations
- * @param $path
+ * @param $nid
  * @return array
  */
-function lndr_sync_batch($path) {
+function lndr_sync_batch($nid) {
   // @todo: This is not true batch yet as we only process one
   $ids = array(1);
   $num_operations = 1;
@@ -223,7 +249,7 @@ function lndr_sync_batch($path) {
       'lndr_sync_batch_op',
       array(
         $ids[$i],
-        $path,
+        $nid,
       ),
     );
   }
@@ -240,19 +266,15 @@ function lndr_sync_batch($path) {
  * @param $path
  * @param $context
  */
-function lndr_sync_batch_op($id, $path, &$context) {
+function lndr_sync_batch_op($id, $nid, &$context) {
   lndr_sync_path();
   // If we run this process with a $path passed in, it means it comes from a
-  // /lndr/reserved => /somepage
-  if ($path != '') {
-    // We check after running the sync, if that path has been updated from reserved to actual lndr page id
-    // Which means it has been published
-    $url_alias = path_load(['alias' => $path]);
-    if (!empty($url_alias)) {
-      // We flag it and send it to the finishing process for proper redirect.
-      if ($url_alias['source'] != '/lndr/reserved') {
-        $context['results']['path_updated'] = $path;
-      }
+  // Node that is reserved and without the lndr_project_id populated.
+  if ($nid != '') {
+    // We check after running the sync, if that node has an updated lndr_project_id
+    $node = node_load($nid);
+    if (!empty($node->lndr_project_id)) {
+      $context['results']['node_updated'] = $nid;
     }
   }
   // $context['message'] = t('some message here');
@@ -269,8 +291,8 @@ function lndr_sync_batch_finished($success, $results, $operations) {
     drupal_set_message(t('Finished deploying Lndr pages.'));
     // If we were sent from a placeholder (/lndr/reserved => path) but the page has been
     // published, we redirect back to that alias so user can see the published page
-    if (array_key_exists('path_updated', $results)) {
-      drupal_goto($results['path_updated']);
+    if (array_key_exists('node_updated', $results)) {
+      drupal_goto('node/' . $results['node_updated']);
     } else {
       // if not, let's go home so we don't create an infinite loop
       drupal_goto('<front>');
@@ -355,42 +377,64 @@ function _lndr_upsert_alias($projects) {
   if (empty($drupal_pages)) {
     return;
   }
+  // @todo: We are ignoring status overall right now in general, should we sync this with Lndr?
+  // @todo: However this is also something that needs to go into a workbench flow.
   // Going through all the pages that are published to this URL
   foreach ($drupal_pages as $page) {
     $path = substr($page['publish_url'], strlen($base_url));
     $path = ltrim($path, '/');
 
-    $existing_alias_by_alias = path_load(array('alias' => $path));
-    if (!empty($existing_alias_by_alias)) {
-      // case 1. this alias was reserved for this page, update it
-      if ($existing_alias_by_alias['source'] === 'lndr/reserved') {
-        $existing_alias_by_alias['source'] = 'lndr/' . $page['id'];
-        $existing_alias_by_alias['alias'] = $path;
-        path_save($existing_alias_by_alias);
+    // Looking to see if a system path exist based on the alias given
+    $existing_system_path_by_alias = drupal_lookup_path('source', $path);
+    if ($existing_system_path_by_alias) {
+      // Let's see if we can find a corresponding node with the system path found
+      // The system path should be node/[nid]
+      $nid = explode('/', $existing_system_path_by_alias);
+      $nid = $nid[1];
+      $node = node_load($nid);
+      if (!empty($node)) {
+        // case 1. this node was reserved for this lndr page, we add a node data to sync with
+        // lndr project, as well as publish it.
+        $lang = $node->language;
+        if (empty($node->lndr_project_id)) {
+          // $node->status = 1;
+          $node->lndr_project_id[$lang][0]['value'] = $page['id'];
+          node_save($node);
+        }
       }
-    }
-    else
-    {
-      // case 3. let's see if a previous alias is stored, but we updated to a new one from Lndr
-      $existing_alias_by_source = path_load(array('source' => 'lndr/' . $page['id']));
-      if (!empty($existing_alias_by_source)) {
+    } else {
+      // case 3. let's see if a previous node is stored, but we updated to a new path from Lndr
+      // within the same domain
+      $query = new EntityFieldQuery();
+      $query->entityCondition('entity_type', 'node')
+        ->entityCondition('bundle', LNDR_CT_TYPE)
+        ->fieldCondition('lndr_project_id', 'value', $page['id'], '=');
+      $result = $query->execute();
+      if (isset($result['node'])) {
         // Making sure that it is still on the same domain
         if (substr($page['publish_url'], 0, strlen($base_url)) === $base_url) {
+          // Extracting the path
           $_path = ltrim(substr($page['publish_url'], strlen($base_url)), '/');
-          if ($_path !== $existing_alias_by_source['alias']) {
-            $existing_alias_by_source['alias'] = $_path;
-            path_save($existing_alias_by_source);
+          // Compare that path with the drupal node alias
+          $result_node = current($result['node']);
+          $node_alias = drupal_lookup_path('alias', 'node/' . $result_node->nid);
+          if ($_path !== $node_alias) {
+            // Update that node alias
+            $node_to_be_updated = node_load($result_node->nid);
+            $node_to_be_updated->path['alias'] = $_path;
+            node_save($node_to_be_updated);
           }
         }
       }
-      else
-      {
-        // case 2. No Drupal alias exist at all, change from some other URL to Drupal domain URL
-        $new_path = array(
-          'source' => 'lndr/' . $page['id'],
-          'alias' => $path,
-        );
-        path_save($new_path);
+      else {
+        // case 2. No Drupal alias exist at all, changed from some other URL to Drupal domain URL
+        // Create a new node and add the relationship
+        $new_node = lndr_reserve_node($path);
+        $lang = $new_node->language;
+        $new_node->lndr_project_id[$lang][0]['value'] = $page['id'];
+        $new_node->title = $page['title'];
+        // $new_node->status = 1;
+        node_save($new_node);
       }
     }
   }
@@ -410,46 +454,27 @@ function _lndr_remove_alias($projects) {
     $_projects[$project['id']] = $project;
   }
 
-  // Get all alias lndr uses (lndr/[project_id])
-  $existing_alias = _lndr_load_alias();
-  if (empty($existing_alias)) {
+  // Load all of the nodes that have existing project ids
+  $nodes =_lndr_load_nodes();
+  if (empty($nodes)) {
     return;
   }
 
-  foreach ($existing_alias as $project_id => $alias) {
-    // Case 5. Remove any local path not presented in the web service
+  foreach ($nodes as $nid => $node) {
+    $lang = $node->language;
+    $project_id = $node->lndr_project_id[$lang][0]['value'];
+    // Case 5. Remove any node with project ids that is not presented in the web service
+    // We assume that project has been removed from Lndr
     if (!array_key_exists($project_id, $_projects)) {
-      path_delete($alias['pid']);
+      node_delete($nid);
     }
-    else
-    {
-    // Case 4. There is a local alias, however, remotely it has been changed to something not in this Domain
+    else {
+      // Case 4. There is a local node, however, remotely it has been changed to something not in this domain
       if (substr($_projects[$project_id]['publish_url'], 0, strlen($base_url)) !== $base_url) {
-        path_delete($alias['pid']);
+        node_delete($nid);
       }
     }
   }
-}
-
-/**
- * Helper function that loads all of the URL alias that has a source of lndr/%
- * @return array
- */
-function _lndr_load_alias() {
-  $data = array();
-  $query = db_select('url_alias', 'u')
-    ->fields('u', array('pid', 'source', 'alias'))
-    ->condition('u.source', 'lndr/%%', 'LIKE');
-
-  $results = $query->execute();
-  foreach ($results as $result) {
-    // extract the lndr project id
-    $path = explode('/', $result->source);
-    if (is_numeric($path[1])) {
-      $data[$path[1]] = (array) $result;
-    }
-  }
-  return $data;
 }
 
 /**
@@ -508,11 +533,9 @@ function lndr_reserve_path() {
   $query = $response['response']['message'];
 
   $path = rtrim($query['path'], '/');
-  $path = array(
-    'source' => 'lndr/reserved',
-    'alias' => $path,
-  );
-  path_save($path);
+
+  // Create an unpublished node.
+  lndr_reserve_node($path);
 
   $response = array(
     'response' => array(
@@ -523,6 +546,49 @@ function lndr_reserve_path() {
   );
   print json_encode($response);
   return;
+}
+
+/**
+ * Create an unpublished node to hold the URL path
+ * string $path
+ */
+function lndr_reserve_node($path) {
+  // At this point we do not have Lndr project ID to add to the node data array yet.
+  $node = new stdClass();
+  $node->title = $path;
+  $node->type = LNDR_CT_TYPE;
+  node_object_prepare($node);
+  $node->language = LANGUAGE_NONE;
+
+  // anonymous user
+  $node->uid = 0;
+  $node->status = 1;
+  $node->promote = 0;
+  $node->path['alias'] = $path;
+  node_save($node);
+
+  return $node;
+}
+
+/**
+ * Helper function that loads all of the nodes that have a lndr project ID
+ */
+function _lndr_load_nodes() {
+
+  $nodes = array();
+
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', 'node')
+    ->entityCondition('bundle', LNDR_CT_TYPE)
+    ->fieldCondition('lndr_project_id', 'value', 'NULL', '!=');
+  $result = $query->execute();
+
+  if (!empty($result)) {
+    $nids = array_keys($result['node']);
+    $nodes = node_load_multiple($nids);
+  }
+
+  return $nodes;
 }
 
 /**
@@ -641,27 +707,6 @@ function _lndr_service_base($check_path = TRUE) {
     ),
   );
   return $response;
-}
-
-/**
- * Internal menu path to handle lndr page stubs
- * @param $page_id
- */
-function lndr_page_display($page_id) {
-  // If we hit a lndr path that looks like /lndr/reserved or similar
-  if (!is_numeric($page_id)) {
-    if ($page_id != 'reserved') {
-      // We will just show a standard "access denied" page in this case.
-      return MENU_ACCESS_DENIED;
-    }
-    // When users hit the my_campaign -> lndr/reserved path, let's actually run the sync process
-    // This way we can deploy this page faster, we can also check if this path reservation is orphaned
-    $alias = drupal_get_path_alias();
-    drupal_goto('lndr_sync', ['query' => ['path' => $alias]]);
-  }
-  // Lndr actually does a 302 redirect from this URL but drupal_Http_request handles it fine
-  $internal_url = LNDR_BASE . 'projects/' . $page_id;
-  _lndr_import_page($internal_url);
 }
 
 /**

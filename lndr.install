@@ -5,11 +5,107 @@
  */
 
 /**
+ * Implements hook_install
+ */
+function lndr_install() {
+  // Insert default pre-defined node types into the database. For a complete
+  // list of available node type attributes, refer to the node type API
+  // documentation at: http://api.drupal.org/api/HEAD/function/hook_node_info.
+  $types = array(
+    array(
+      'type' => 'lndr_page',
+      'name' => st('Lndr: Landing page'),
+      'base' => 'node_content',
+      'description' => st("<em>Lndr: Landing page</em> are automatically imported in Drupal from Lndr."),
+      'custom' => 1,
+      'modified' => 1,
+      'locked' => 0,
+    ),
+  );
+  foreach ($types as $type) {
+    $type = node_type_set_defaults($type);
+    node_type_save($type);
+    // node_add_body_field($type);
+    lndr_add_custom_fields();
+  }
+}
+
+/**
  * Implements hook_uninstall
  */
 function lndr_uninstall() {
+  // Remove the node type and all of associated nodes
+  $type = 'lndr_page';
+  // First, delete nodes
+  $results = db_select('node', 'n')
+    ->fields('n', array('nid'))
+    ->condition('type', $type)
+    ->execute();
+  foreach ($results as $result) {
+    $nids[] = $result->nid;
+  }
+  if (!empty($nids)) {
+    node_delete_multiple($nids);
+    lndr_delete_custom_fields();
+    drupal_set_message(t('%count nodes has been deleted.', array('%count' => count($nids))));
+  }
+  // Then, delete content type
+  if (node_type_load($type)) {
+    node_type_delete($type);
+    variable_del('node_preview_' . $type);
+    drupal_set_message(t('%type content type has been deleted.', array('%type' => $type)));
+  }
+  node_types_rebuild();
+  menu_rebuild();
+
   // Remove all of the variable set by this module
   variable_del('lndr_token');
   variable_del('lndr_debug_mode');
   variable_del('lndr_api_info');
+}
+
+function lndr_add_custom_fields() {
+  foreach (_lndr_installed_fields() as $field) {
+    field_create_field($field);
+  }
+  foreach (_lndr_installed_instances() as $fieldinstance) {
+    $fieldinstance['entity_type'] = 'node';
+    $fieldinstance['bundle'] = 'lndr_page';
+    field_create_instance($fieldinstance);
+  }
+}
+
+function lndr_delete_custom_fields() {
+  foreach (array_keys(_lndr_installed_fields()) as $field) {
+    field_delete_field($field);
+  }
+  $instances = field_info_instances('node', 'lndr_page');
+  foreach ($instances as $instance_name => $fieldinstance) {
+    field_delete_instance($fieldinstance);
+  }
+}
+
+function _lndr_installed_fields() {
+  $t = get_t();
+  return array(
+    'lndr_project_id' => array(
+      'field_name' => 'lndr_project_id',
+      'label' => $t('Corresponding Lndr project (page) ID'),
+      'type' => 'text'
+    ),
+  );
+}
+
+function _lndr_installed_instances() {
+  $t = get_t();
+  return array(
+    'lndr_project_id' => array(
+      'field_name' => 'lndr_project_id',
+      'type' => 'text',
+      'label' => $t('Corresponding Lndr project (page) ID'),
+      'widget' => array(
+        'type' => 'text_textfield'
+      ),
+    ),
+  );
 }
