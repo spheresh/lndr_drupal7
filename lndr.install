@@ -16,9 +16,6 @@ function lndr_update_7200(&$sandbox) {
   $aliases = _lndr_update_load_alias();
   if (!empty($aliases)) {
    foreach ($aliases as $pid => $alias) {
-     // remove the path alias
-     path_delete($pid);
-
      $node = new stdClass();
      $node->title = $alias['alias'];
      $node->type = LNDR_CT_TYPE;
@@ -39,6 +36,11 @@ function lndr_update_7200(&$sandbox) {
        $node->lndr_project_id[LANGUAGE_NONE][0]['value'] = $lndr_project_id;
      }
      node_save($node);
+     
+     // Lastly, let's remove the old aliases
+     $query = db_delete('url_alias');
+     $query->condition('pid', $pid);
+     $query->execute();
    }
   }
 }
