@@ -6,13 +6,65 @@
 
 /**
  * Adding new content type and custom fields for Lndr
+ * Migrate all existing lndr pages to nodes
  */
 function lndr_update_7200(&$sandbox) {
   // simply invoking lndr_install()
   lndr_install();
 
-  // @todo: we also need to migrate all existing url alias/path to the new content type we have created
+  // We are migrating all existing url alias/path to the new content type we have created
+  $aliases = _lndr_update_load_alias();
+  if (!empty($aliases)) {
+   foreach ($aliases as $pid => $alias) {
+     // remove the path alias
+     path_delete($pid);
+
+     $node = new stdClass();
+     $node->title = $alias['alias'];
+     $node->type = LNDR_CT_TYPE;
+     node_object_prepare($node);
+     $node->language = LANGUAGE_NONE;
+
+     // anonymous user
+     $node->uid = 0;
+     $node->status = 1;
+     $node->promote = 0;
+     $node->path['alias'] = $alias['alias'];
+
+     $source = explode('/', $alias['source']);
+     $lndr_project_id = $source[1];
+
+     // if this was a published page, we also need to add the field association
+     if ($lndr_project_id != 'reserved') {
+       $node->lndr_project_id[LANGUAGE_NONE][0]['value'] = $lndr_project_id;
+     }
+     node_save($node);
+   }
+  }
 }
+
+/**
+ * Look up of all path alias associated with Lndr
+ * @return array
+ */
+function _lndr_update_load_alias() {
+  $data = array();
+  $query = db_select('url_alias', 'u')
+    ->fields('u', array('pid', 'source', 'alias'))
+    ->condition('u.source', 'lndr/%%', 'LIKE');
+
+  $results = $query->execute();
+  foreach ($results as $result) {
+    // extract the lndr project id
+    $path = explode('/', $result->source);
+    if (is_numeric($path[1])) {
+      $data[$path[1]] = (array) $result;
+    }
+  }
+  return $data;
+}
+
+
 
 /**
  * Implements hook_install
