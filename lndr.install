@@ -5,6 +5,16 @@
  */
 
 /**
+ * Adding new content type and custom fields for Lndr
+ */
+function lndr_update_7200(&$sandbox) {
+  // simply invoking lndr_install()
+  lndr_install();
+
+  // @todo: we also need to migrate all existing url alias/path to the new content type we have created
+}
+
+/**
  * Implements hook_install
  */
 function lndr_install() {
