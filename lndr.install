@@ -15,7 +15,7 @@ function lndr_update_7200(&$sandbox) {
   // We are migrating all existing url alias/path to the new content type we have created
   $aliases = _lndr_update_load_alias();
   if (!empty($aliases)) {
-   foreach ($aliases as $pid => $alias) {
+   foreach ($aliases as $lndr_project_id => $alias) {
      $node = new stdClass();
      $node->title = $alias['alias'];
      $node->type = LNDR_CT_TYPE;
@@ -28,18 +28,15 @@ function lndr_update_7200(&$sandbox) {
      $node->promote = 0;
      $node->path['alias'] = $alias['alias'];
 
-     $source = explode('/', $alias['source']);
-     $lndr_project_id = $source[1];
-
      // if this was a published page, we also need to add the field association
      if ($lndr_project_id != 'reserved') {
        $node->lndr_project_id[LANGUAGE_NONE][0]['value'] = $lndr_project_id;
      }
      node_save($node);
-     
+
      // Lastly, let's remove the old aliases
      $query = db_delete('url_alias');
-     $query->condition('pid', $pid);
+     $query->condition('pid', $alias['pid']);
      $query->execute();
    }
   }
