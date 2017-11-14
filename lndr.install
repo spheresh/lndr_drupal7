@@ -56,9 +56,9 @@ function _lndr_update_load_alias() {
   foreach ($results as $result) {
     // extract the lndr project id
     $path = explode('/', $result->source);
-    if (is_numeric($path[1])) {
+    // if (is_numeric($path[1])) {
       $data[$path[1]] = (array) $result;
-    }
+    // }
   }
   return $data;
 }
