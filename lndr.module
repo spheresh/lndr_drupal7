@@ -718,6 +718,7 @@ function _lndr_service_base($check_path = TRUE) {
 function _lndr_import_page($url) {
 
   $result = drupal_http_request($url);
+
   // error with fetching the url
   if ($result->code != '200') {
     $message = 'Lndr was unable to fetch the url: %url with code: %code and error: %error';
@@ -734,9 +735,11 @@ function _lndr_import_page($url) {
     );
   }
 
+  // Now that lndr does a redirect, e.g. from https://lndr.co/projects/j4Jsm to https://lndr.co/p/pagetitle-f8dc59e687fb8fe0/
+  // We need to use the redirected url as the base for all hte assets, etc.
   // Lndr issues a redirect from projects/project_id to actual page where resource is
   if (property_exists($result, 'redirect_code')) {
-    if ($result->redirect_code === '302') {
+    if ($result->redirect_code == '302' || $result->redirect_code == '301') {
       $url = $result->redirect_url;
     }
   }
