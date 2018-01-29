@@ -649,16 +649,12 @@ function _lndr_service_base($check_path = TRUE) {
  */
 function lndr_page_display($page_id) {
   // If we hit a lndr path that looks like /lndr/reserved or similar
-  if (!is_numeric($page_id)) {
-    if ($page_id != 'reserved') {
-      // We will just show a standard "access denied" page in this case.
-      return MENU_ACCESS_DENIED;
+    if ($page_id == 'reserved') {
+      // When users hit the my_campaign -> lndr/reserved path, let's actually run the sync process
+      // This way we can deploy this page faster, we can also check if this path reservation is orphaned
+      $alias = drupal_get_path_alias();
+      drupal_goto('lndr_sync', ['query' => ['path' => $alias]]);
     }
-    // When users hit the my_campaign -> lndr/reserved path, let's actually run the sync process
-    // This way we can deploy this page faster, we can also check if this path reservation is orphaned
-    $alias = drupal_get_path_alias();
-    drupal_goto('lndr_sync', ['query' => ['path' => $alias]]);
-  }
   // Lndr actually does a 302 redirect from this URL but drupal_Http_request handles it fine
   $internal_url = LNDR_BASE . 'projects/' . $page_id;
   _lndr_import_page($internal_url);
@@ -691,7 +687,7 @@ function _lndr_import_page($url) {
 
   // Lndr issues a redirect from projects/project_id to actual page where resource is
   if (property_exists($result, 'redirect_code')) {
-    if ($result->redirect_code === '302') {
+    if ($result->redirect_code == '302' || $result->redirect_code == '301') {
       $url = $result->redirect_url;
     }
   }
