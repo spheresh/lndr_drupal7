@@ -163,6 +163,43 @@ function lndr_menu_alter(&$items) {
 }
 
 /**
+ * Implements hook_form_FORM_ID_alter
+ * Adding a lnk on the content administration page.
+ */
+function lndr_form_node_admin_content_alter(&$form, &$form_state, $form_id) {
+  $nodes = $form['admin']['nodes']['#options'];
+  if (empty($nodes)) {
+    return;
+  }
+
+  $lndr_node_nids = [];
+  foreach ($nodes as $nid => $node) {
+    if ($node['type'] == 'Lndr: Landing page') {
+      $lndr_node_nids[] = $nid;
+    }
+  }
+
+  if (empty($lndr_node_nids)) {
+    return;
+  }
+
+  $lndr_nodes = node_load_multiple($lndr_node_nids);
+  foreach ($lndr_nodes as $lndr_node) {
+    $lang = $lndr_node->language;
+    if (!empty($lndr_node->lndr_project_id)) {
+      $lndr_project_id = $lndr_node->lndr_project_id[$lang][0]['value'];
+      if ($lndr_project_id == 'reserved') {
+        continue;
+      }
+      $lndr_edit_link = $form['admin']['nodes']['#options'][$lndr_node->nid]['operations']['data']['#links']['edit'];
+      $lndr_edit_link['title'] = t('lndr');
+      $lndr_edit_link['href'] = 'https://www.lndr.co/projects/' . $lndr_project_id . '/edit';
+      $form['admin']['nodes']['#options'][$lndr_node->nid]['operations']['data']['#links']['lndr'] = $lndr_edit_link;
+    }
+  }
+}
+
+/**
  * Hijacking the node view for custom rendering of Lndr landing page
  * @param $node
  */
