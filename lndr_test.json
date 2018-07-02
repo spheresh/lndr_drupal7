@@ -1,15 +1,15 @@
 {
   "projects": [
     {
-      "id": "243",
-      "title": "Sporty",
-      "description": "This is a smiple example project",
+      "id": "2X2hg",
+      "title": "Syngenta test",
+      "description": "Syngenta test",
       "keywords": "simple, example, landing, hello, world",
-      "template": "Sporty",
-      "editor_url": "http://www.lndr.co/projects/243/edit",
-      "screenshot": "http:///www.lndr.co/project_files/243/screenshot.jpg?refresh=cb05d691b1a0ccc7eb4f426d",
-      "url": "http:///p.lndr/sporty",
-      "publish_url": "http://localhost:8888/lndr/sports",
+      "template": "Syngenta",
+      "editor_url": "https://lndr.co/projects/2X2hg/edit",
+      "screenshot": "http:///www.lndr.co/project_files/2X2hg/screenshot.jpg",
+      "url": "https://lndr.co/p/syngenta-test",
+      "publish_url": "http://localhost:8888/lndr/syngenta-test",
       "published": "true",
       "created_at": "Thu, 18 May 2017 07:22:12 UTC +00:00",
       "updated_at": "Mon, 22 May 2017 09:01:22 UTC +00:00"

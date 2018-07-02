@@ -163,6 +163,26 @@ function lndr_menu_alter(&$items) {
 }
 
 /**
+ * Implements hook_form_FORM_ID_alter
+ * @param $form
+ * @param $form_state
+ * @param $form_id
+ */
+function lndr_form_node_admin_content_alter(&$form, &$form_state, $form_id) {
+  $nodes = $form['admin']['nodes']['#options'];
+  if (empty($nodes)) {
+    return;
+  }
+
+  foreach ($nodes as $nid => $node) {
+    if ($node['type'] == 'Lndr: Landing page') {
+      $form['admin']['nodes']['#options'][$nid]['operations']['data']['#attributes']['class'][] = 'external';
+    }
+  }
+}
+
+
+/**
  * Hijacking the node view for custom rendering of Lndr landing page
  * @param $node
  */
@@ -430,6 +450,7 @@ function _lndr_upsert_alias($projects) {
         // case 2. No Drupal alias exist at all, changed from some other URL to Drupal domain URL
         // Create a new node and add the relationship
         $new_node = lndr_reserve_node($path);
+        lndr_import_resources();
         $lang = $new_node->language;
         $new_node->lndr_project_id[$lang][0]['value'] = $page['id'];
         $new_node->title = $page['title'];
@@ -707,6 +728,89 @@ function _lndr_service_base($check_path = TRUE) {
     ),
   );
   return $response;
+}
+
+/**
+ * Parsing resources
+ * @return array
+ */
+function lndr_import_resources() {
+  $url = 'https://lndr.co/p/syngenta-test/';
+
+  $result = drupal_http_request($url);
+
+  // error with fetching the url
+  if ($result->code != '200') {
+    $message = 'Lndr was unable to fetch the url: %url with code: %code and error: %error';
+    $variables = array(
+      '%url' => $url,
+      '%code' => $result->code,
+      '%error' => $result->error,
+    );
+    watchdog('lndr', $message, $variables, WATCHDOG_WARNING, 'node');
+    $error = t('Unable to fetch the url given, please check the logs for more details');
+    return array(
+      'error' => 1,
+      'message' => $error,
+    );
+  }
+
+  // Now that lndr does a redirect, e.g. from https://lndr.co/projects/j4Jsm to https://lndr.co/p/pagetitle-f8dc59e687fb8fe0/
+  // We need to use the redirected url as the base for all hte assets, etc.
+  // Lndr issues a redirect from projects/project_id to actual page where resource is
+  if (property_exists($result, 'redirect_code')) {
+    if ($result->redirect_code == '302' || $result->redirect_code == '301') {
+      $url = $result->redirect_url;
+    }
+  }
+
+  // Save the html into a directory
+  $url_parts = explode('/', trim($url, '\/'));
+  $url_parts = array_reverse($url_parts);
+
+  $directory = 'public://lndr/' . $url_parts[0];
+  file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
+  $file_saved = file_unmanaged_save_data($result->data, $directory . '/index.html');
+  if (!$file_saved) {
+    $message = 'Unable to save index file from ' . $url;
+    $variables = [
+      '%url' => $url,
+    ];
+    watchdog('lndr', $message, $variables, WATCHDOG_WARNING, 'node');
+  }
+
+  // Start to parse the content
+  module_load_include('inc', 'lndr', 'simple_html_dom');
+  $html = str_get_html($result->data);
+
+  // Saving assets
+  $selectors = [
+    'img',
+    'link[rel="stylesheet"]',
+    'script',
+  ];
+  foreach ($selectors as $selector) {
+    $source_attr = 'src';
+    if ($selector == 'link[rel="stylesheet"]') {
+      $source_attr = 'href';
+    }
+    foreach ($html->find($selector) as $key => $element) {
+      // Ignoring external resources such as jquery CDN, etc for now, only saving local assets
+      if (substr($element->{$source_attr}, 0, 4) !== 'http') {
+        // Creating the directory for the file if needed before saving
+        $file_path_info = pathinfo($element->{$source_attr});
+        // There might be some inline script we don't care for.
+        if (array_key_exists('dirname', $file_path_info)) {
+          $resource_dir = $directory . '/' . $file_path_info['dirname'];
+          if (!file_prepare_directory($resource_dir)) {
+            file_prepare_directory($resource_dir, FILE_CREATE_DIRECTORY);
+          }
+          $resource_data = file_get_contents($url . $element->{$source_attr});
+          file_unmanaged_save_data($resource_data, $directory . '/' . $element->{$source_attr});
+        }
+      }
+    }
+  }
 }
 
 /**
