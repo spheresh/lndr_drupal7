@@ -6,3 +6,4 @@ version = 7.x-2.0
 configure = admin/config/content/lndr
 dependencies[] = path
 dependencies[] = field
+files[] = lndr.functions.inc
