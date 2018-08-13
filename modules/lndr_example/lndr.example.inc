@@ -15,8 +15,6 @@
  * @return array
  */
 function lndr_example($form, &$form_state) {
-drush_print_r(__FUNCTION__);
-
   $form['lndr_example_url'] = array(
     '#type' => 'textfield',
     '#title' => t('Test landing page URL'),
@@ -39,8 +37,6 @@ drush_print_r(__FUNCTION__);
  * @param $form_state
  */
 function lndr_example_validate($form, &$form_state) {
-drush_print_r(__FUNCTION__);
-
   if (!valid_url($form_state['values']['lndr_example_url'], TRUE)) {
     form_set_error('lndr_example_url', t('Please enter a valid URL'));
   }
@@ -57,8 +53,6 @@ drush_print_r(__FUNCTION__);
  * @param $form_state
  */
 function lndr_example_submit($form, &$form_state) {
-drush_print_r(__FUNCTION__);
-
   drupal_goto('examples/lndr/render', array('query' => array('url' => $form_state['values']['lndr_example_url'])));
 }
 
@@ -68,8 +62,6 @@ drush_print_r(__FUNCTION__);
  * @return string
  */
 function lndr_example_render() {
-drush_print_r(__FUNCTION__);
-
   $query = drupal_get_query_parameters();
   if (!isset($query['url'])) {
     return 'Invalid url passed';
@@ -85,9 +77,7 @@ drush_print_r(__FUNCTION__);
  * Emulate the lndr web service call.
  */
 function lndr_example_service() {
-drush_print_r(__FUNCTION__);
-
-  $path = drupal_get_path('module', 'lndr') . '/lndr_test.json';
+  $path = drupal_get_path('module', 'lndr_example') . '/lndr_test.json';
   $data = file_get_contents($path);
   print $data;
 }

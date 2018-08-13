@@ -9,8 +9,6 @@
  * Migrate all existing lndr pages to nodes
  */
 function lndr_update_7200(&$sandbox) {
-drush_print_r(__FUNCTION__);
-
   // simply invoking lndr_install()
   lndr_install();
 
@@ -49,8 +47,6 @@ drush_print_r(__FUNCTION__);
  * @return array
  */
 function _lndr_update_load_alias() {
-drush_print_r(__FUNCTION__);
-
   $data = array();
   $query = db_select('url_alias', 'u')
     ->fields('u', array('pid', 'source', 'alias'))
@@ -73,8 +69,6 @@ drush_print_r(__FUNCTION__);
  * Implements hook_install
  */
 function lndr_install() {
-drush_print_r(__FUNCTION__);
-
   // Insert default pre-defined node types into the database. For a complete
   // list of available node type attributes, refer to the node type API
   // documentation at: http://api.drupal.org/api/HEAD/function/hook_node_info.
@@ -101,8 +95,6 @@ drush_print_r(__FUNCTION__);
  * Implements hook_uninstall
  */
 function lndr_uninstall() {
-drush_print_r(__FUNCTION__);
-
   // Remove the node type and all of associated nodes
   $type = 'lndr_page';
   // First, delete nodes
@@ -136,8 +128,6 @@ drush_print_r(__FUNCTION__);
 }
 
 function lndr_add_custom_fields() {
-drush_print_r(__FUNCTION__);
-
   foreach (_lndr_installed_fields() as $field) {
     field_create_field($field);
   }
@@ -149,8 +139,6 @@ drush_print_r(__FUNCTION__);
 }
 
 function lndr_delete_custom_fields() {
-drush_print_r(__FUNCTION__);
-
   foreach (array_keys(_lndr_installed_fields()) as $field) {
     field_delete_field($field);
   }
@@ -161,8 +149,6 @@ drush_print_r(__FUNCTION__);
 }
 
 function _lndr_installed_fields() {
-drush_print_r(__FUNCTION__);
-
   $t = get_t();
   return array(
     'lndr_project_id' => array(
@@ -174,8 +160,6 @@ drush_print_r(__FUNCTION__);
 }
 
 function _lndr_installed_instances() {
-drush_print_r(__FUNCTION__);
-
   $t = get_t();
   return array(
     'lndr_project_id' => array(

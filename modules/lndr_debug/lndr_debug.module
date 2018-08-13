@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Drupal needs this blank file.
@@ -8,15 +9,12 @@
  * Implements hook_menu().
  */
 function lndr_debug_menu() {
-drush_print_r(__FUNCTION__);
-
-
   $items['service/lndr/debug'] = array(
     'title' => 'Lndr service debug',
     'page callback' => 'lndr_example_service_debug',
     'access arguments' => array('access content'),
     'type' => MENU_CALLBACK,
-    'file' => 'lndr.example.inc',
+    'file' => 'lndr.debug.inc',
   );
 
   return $items;

@@ -8,8 +8,6 @@
  * Implements hook_menu().
  */
 function lndr_example_menu() {
-drush_print_r(__FUNCTION__);
-
 
   // Links for development testing.
   $items['examples/lndr'] = array(
@@ -48,9 +46,6 @@ drush_print_r(__FUNCTION__);
  * @return array
  */
 function _lndr_import_page($url) {
-drush_print_r(__FUNCTION__);
-
-
   $result = drupal_http_request($url);
 
   // Error with fetching the url.

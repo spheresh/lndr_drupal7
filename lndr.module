@@ -1,9 +1,5 @@
 <?php
-if(!function_exists('drush_print_r')) {
-  function drush_print_r($text){
-    watchdog('lndr', var_export($text, TRUE));
-  }
-}
+
 /**
  * @file
  * Code for the Lndr module.
@@ -24,7 +20,6 @@ define('LNDR_CT_TYPE', 'lndr_page');
  * @return null|string
  */
 function lndr_help($path, $arg = array()) {
-drush_print_r(__FUNCTION__);
 
   switch ($path) {
     case 'admin/config/content/lndr':
@@ -57,9 +52,6 @@ drush_print_r(__FUNCTION__);
  * Enable cross-domain request for the API path.
  */
 function lndr_init() {
-drush_print_r(__FUNCTION__);
-
-
   // Only add the CORS header to our service path for security.
   $current_path = drupal_strtolower(drupal_get_path_alias($_GET['q']));
   $page_match = drupal_match_path($current_path, 'service/lndr/*');
@@ -69,7 +61,7 @@ drush_print_r(__FUNCTION__);
   if ($page_match) {
     // Let's add our CORS headers.
     $headers = array(
-      'Access-Control-Allow-Origin' => 'https://lndr.co',
+      'Access-Control-Allow-Origin' => '*',
       'Access-Control-Allow-Credentials' => TRUE,
       'Access-Control-Allow-Methods' => 'GET, POST',
       'Access-Control-Allow-Headers' => 'Authorization',
@@ -87,8 +79,6 @@ drush_print_r(__FUNCTION__);
  * Implements hook_menu.
  */
 function lndr_menu() {
-drush_print_r(__FUNCTION__);
-
 
   $items['admin/config/content/lndr'] = array(
     'title' => 'Lndr: Landing Page Builder',
@@ -110,14 +100,6 @@ drush_print_r(__FUNCTION__);
     'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
-
-  // Links for URL validation and API method.
-  // $items['lndr_sync'] = array(
-  //  'title' => 'Deploying Lndr page',
-  //  'page callback' => 'lndr_sync',
-  //  'access arguments' => array('access content'),
-  //  'type' => MENU_CALLBACK,
-  // );
 
   // Drupal API to check URL availability.
   $items['service/lndr/validate_path'] = array(
@@ -147,13 +129,42 @@ drush_print_r(__FUNCTION__);
 }
 
 /**
+ * Implements hook_load().
+ */
+function lndr_load($alias) {
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', 'node')
+    ->entityCondition('bundle', LNDR_CT_TYPE)
+    ->fieldCondition('lndr_project_id', 'value', $alias, '=');
+  $result = $query->execute();
+  if (isset($result['node'])) {
+    return node_load(reset($result['node'])->nid);
+  }
+  else {
+    return FALSE;
+  }
+}
+
+/**
+ * Menu callback function.
+ *
+ * @param $node
+ *   Lndr node object.
+ */
+function lndr_source_file_deliver($node) {
+  module_load_include('inc', 'lndr');
+  $args = func_get_args();
+  array_shift($args);
+  $target = implode('/', $args);
+  lndr_file_transfer($node, $target);
+}
+
+/**
  * Implements hook_menu_alter.
  *
  * @param $items
  */
 function lndr_menu_alter(&$items) {
-drush_print_r(__FUNCTION__);
-
   // @todo: not the best approach, however, sufficient for a POC.
   $items['node/%node']['page callback'] = 'lndr_custom_node_view';
 }
@@ -166,13 +177,10 @@ drush_print_r(__FUNCTION__);
  * @param $form_id
  */
 function lndr_form_node_admin_content_alter(&$form, &$form_state, $form_id) {
-drush_print_r(__FUNCTION__);
-
   $nodes = $form['admin']['nodes']['#options'];
   if (empty($nodes)) {
     return;
   }
-
   foreach ($nodes as $nid => $node) {
     if ($node['type'] == 'Lndr: Landing page') {
       $form['admin']['nodes']['#options'][$nid]['operations']['data']['#attributes']['class'][] = 'external';
@@ -192,9 +200,14 @@ drush_print_r(__FUNCTION__);
  *   Page delivery render array.
  */
 function lndr_custom_node_view($node) {
-drush_print_r(__FUNCTION__);
-
   if ($node->type == LNDR_CT_TYPE) {
+    module_load_include('inc', 'lndr');
+    $lang = $node->language;
+    $lndr_project_id = $node->lndr_project_id[$lang][0]['value'];
+    if (!file_exists('public://lndr/' . $lndr_project_id . '/index.html')) {
+      // lndr_import_resources($lndr_project_id);
+      return drupal_not_found();
+    }
     lndr_file_transfer($node, 'index.html');
   }
   else {
@@ -204,17 +217,11 @@ drush_print_r(__FUNCTION__);
 
 /**
  * Implements hook_cron.
+ *
+ * @throws \Exception
  */
 function lndr_cron() {
-  drush_print_r(__FUNCTION__);
   lndr_sync_path();
-  /*module_load_include('inc', 'lndr');
-  $result = lndr_get_projects();
-  $queue = DrupalQueue::get('lndr_source_feed');
-  foreach ($result['projects'] as $project) {
-    $object = lndr_load($project["id"]);
-    $queue->createItem(array($project, $object->nid));
-  }*/
 }
 
 /**
@@ -232,21 +239,17 @@ function lndr_cron_queue_info() {
  * Cron queue functional callback.
  */
 function lndr_source_refresh($args) {
-  drush_print_r(__FUNCTION__);
-  list($project, $nid) = $args;
-  if($nid === FALSE) {
+  list($project, $nid, $force) = $args;
+  if ($nid === FALSE) {
     // If We haven't associated node just finish cron job.
     return;
   }
-  // @ TODO Just for 5.3
-  $cur_date = new DateTime();
-  $pro_date = new DateTime($project["updated_at"]);
-  if(is_numeric($nid) && ($node = node_load($nid) !== FALSE)){
+  if (is_numeric($nid) && (($node = node_load($nid)) !== FALSE)) {
     /* @var object $node */
-    if ($project["published"] == TRUE &&
-      $cur_date->getTimestamp(($node->changed > $node->created ? $node->changed : $node->created)) - $pro_date->getTimestamp() > 0
-    ) {
-      lndr_import_resources($project['origin_url']);
+    $node_date = ($node->changed > $node->created ? $node->changed : $node->created);
+    $pro_date = new DateTime($project["updated_at"]);
+    if ($project["published"] == TRUE && ($pro_date->getTimestamp() - $node_date > 0 || $force)) {
+      lndr_import_resources($project['id']);
     }
   }
 }
@@ -273,11 +276,9 @@ if (!function_exists('getallheaders')) {
 }
 
 /**
- * @return mixed|void
+ * @return string|bool
  */
 function lndr_client_get_projects() {
-drush_print_r(__FUNCTION__);
-
   // Get the API token.
   $api_token = variable_get('lndr_token', '');
   if ($api_token === '') {
@@ -309,16 +310,17 @@ drush_print_r(__FUNCTION__);
     );
     watchdog('lndr', $message, $variables, WATCHDOG_WARNING, 'admin/config/content/lndr');
     // @todo: is there another persistent way to add a message to alert admins about this, ideally add a message like there's a security updates.
-    return;
+    return FALSE;
   }
   return json_decode($result->data, TRUE);
 }
 
 /**
  * Syncing the url alias from Lndr.
+ *
+ * @throws \Exception
  */
 function lndr_sync_path() {
-  drush_print_r(__FUNCTION__);
   module_load_include('inc', 'lndr');
   $data = lndr_get_projects();
   if (!$data || empty($data)) {
@@ -327,63 +329,86 @@ function lndr_sync_path() {
   $data = $data['projects'];
   // Create or update alias in Drupal.
   _lndr_upsert_alias($data);
-
-  // Remove alias in Drupal (when page is deleted or published to other domains)
-//  _lndr_remove_alias($data);
 }
 
 /**
  * Create or update alias in Drupal for Lndr pages.
  *
  * @param $projects
+ *
+ * @throws \Exception
  */
 function _lndr_upsert_alias($projects) {
-  drush_print_r(__FUNCTION__);
-
   global $base_url;
   module_load_include('inc', 'lndr');
-  $drupal_pages = array();
+  $new_projects = $updated_projects = $existing_projects = $empty_projects_node = $depricated_projects = array();
   foreach ($projects as $project) {
-    $drupal_pages[$project["id"]] = $project;
+    $new_projects[$project["id"]] = $project;
   }
-  // Nothing to process.
-  if (empty($drupal_pages)) {
+
+  if (empty($new_projects)) {
     return;
   }
-
-  $lndr_ids = array_keys($drupal_pages);
-  $node = _lndr_load_nodes($lndr_ids);
-  foreach ($drupal_pages as $lndr_id => $page) {
-    if (substr($page['publish_url'], 0, strlen($base_url)) === $base_url) {
-      $path = ltrim(substr($page['publish_url'], strlen($base_url)), '/');
-      lndr_reserve_node($path, $lndr_id);
+  $empty_projects_node = array();
+  $nodes = _lndr_load_nodes();
+  foreach ($nodes as $node) {
+    $lndr_project_id = field_get_items('node', $node, 'lndr_project_id');
+    if (empty($lndr_project_id)) {
+      $empty_projects_node[] = $node->nid;
     }
     else {
-      unset($drupal_pages[$lndr_id]);
+      $lndr_id = (reset($lndr_project_id))['value'];
+      $project = lndr_find_project_by_prop('id', ($lndr_id));
+      if ($project !== FALSE) {
+        if (substr($project['publish_url'], 0, strlen($base_url)) === $base_url) {
+
+          $node_date = ($node->changed > $node->created ? $node->changed : $node->created);
+          $pro_date = new DateTime($project["updated_at"]);
+          if ($pro_date->getTimestamp() - $node_date > 0) {
+            $updated_projects[$node->nid] = $project;
+          }
+          else {
+            $existing_projects[$node->nid] = $node;
+          }
+        }
+        else {
+          $depricated_projects[] = $node->nid;
+        }
+        unset($new_projects[$lndr_id]);
+      }
+      else {
+        $depricated_projects[] = $node->nid;
+      }
     }
   }
-  _lndr_remove_alias($lndr_ids);
-}
 
-/**
- * Remove alias in Drupal no longer published to by Lndr.
- *
- * @param $projects
- */
-function _lndr_remove_alias($lndr_ids) {
-  drush_print_r(__FUNCTION__);
+  // A lndr_project_id field is required, so we can delete all node with an empty field.
+  node_delete_multiple(array_merge($empty_projects_node, $depricated_projects));
+
+  foreach ($new_projects as $new_project) {
+    if ($new_project["published"] == TRUE) {
+      $path = ltrim(substr($new_project['publish_url'], strlen($base_url)), '/');
+      lndr_reserve_node($path, $new_project['id']);
+    }
+  }
+  foreach ($updated_projects as $nid => $updated_project) {
+    $node = node_load($nid);
+    $updated_at = new DateTime($project["updated_at"]);
+    $node->title = $project["title"];
+    $path = ltrim(substr($project['publish_url'], strlen($base_url)), '/');
+    $node->path['alias'] = $path;
+    $node->changed = $updated_at->getTimestamp();
+    node_save($node);
+  }
 }
 
 /**
  * Check whether a path alias is available.
  *
  * @deprecated
- *    Currently, Lndr allows to continue creating page even a validation was
- *   failed.
+ *   Currently, Lndr allows to continue creating page even a validation was failed.
  */
 function lndr_validate_path() {
-drush_print_r(__FUNCTION__);
-
   module_load_include('inc', 'lndr');
 
   $response = _lndr_service_base();
@@ -397,7 +422,7 @@ drush_print_r(__FUNCTION__);
   // Query array is stored in response message if everything is fine.
   $query = $response['response']['message'];
   $path = trim($query['path'], '/');
-  $existing_path = lndr_check_path_exiting($path);
+  $existing_path = lndr_check_path_existing($path);
   if (empty($existing_path)) {
     $response = array(
       'response' => array(
@@ -429,8 +454,6 @@ drush_print_r(__FUNCTION__);
  *    We leave this function for compatibilities with old AI of Lndr.
  */
 function lndr_reserve_path() {
-drush_print_r(__FUNCTION__);
-
   $response = _lndr_service_base();
   // If token doesn't check out or others, we exit.
   if ($response['response']['type'] === 'error') {
@@ -455,15 +478,12 @@ drush_print_r(__FUNCTION__);
 /**
  * Helper function that loads all of the nodes that have a lndr project ID.
  */
-function _lndr_load_nodes($lndr_ids = []) {
-  drush_print_r(__FUNCTION__);
-
+function _lndr_load_nodes() {
   $nodes = array();
 
   $query = new EntityFieldQuery();
   $query->entityCondition('entity_type', 'node')
-    ->entityCondition('bundle', LNDR_CT_TYPE)
-    ->fieldCondition('lndr_project_id', 'value', $lndr_ids);
+    ->entityCondition('bundle', LNDR_CT_TYPE);;
   $result = $query->execute();
 
   if (isset($result['node']) && !empty($result['node'])) {
@@ -476,17 +496,16 @@ function _lndr_load_nodes($lndr_ids = []) {
 
 /**
  * Sync contents published/deleted from Lndr.
+ *
+ * @throws \Exception
  */
 function lndr_sync_content() {
-drush_print_r(__FUNCTION__);
-
   $response = _lndr_service_base(FALSE);
   // If token doesn't check out or other issues, we exit.
-//  if ($response['response']['type'] === 'error') {
-//    drupal_json_output($response);
-//    drupal_exit();
-//  }
-  // Same as when we run cron.
+  if ($response['response']['type'] === 'error') {
+    drupal_json_output($response);
+    drupal_exit();
+  }
   lndr_sync_path();
   $response = array(
     'response' => array(
@@ -506,8 +525,6 @@ drush_print_r(__FUNCTION__);
  * @return mixed
  */
 function _lndr_getallheaders() {
-drush_print_r(__FUNCTION__);
-
   // Get all headers.
   $headers = getallheaders();
   // Workaround if somehow the authorization header is not here.
@@ -533,9 +550,6 @@ drush_print_r(__FUNCTION__);
  * @return array
  */
 function _lndr_service_base($check_path = TRUE) {
-drush_print_r(__FUNCTION__);
-
-
   // Check if the request has the appropriate API token in the header.
   $headers = _lndr_getallheaders();
 
@@ -606,41 +620,23 @@ drush_print_r(__FUNCTION__);
  *
  * @return array
  */
-function lndr_import_resources($url) {
-drush_print_r(__FUNCTION__);
-
-  $result = drupal_http_request($url);
-  if ($result->code != '200') {
-    $message = 'Lndr was unable to fetch the url: %url with code: %code and error: %error';
-    $variables = array(
-      '%url' => $url,
-      '%code' => $result->code,
-      '%error' => $result->error,
-    );
-    watchdog('lndr', $message, $variables, WATCHDOG_WARNING, 'node');
-    $error = t('Unable to fetch the url given, please check the logs for more details');
-    return array(
-      'error' => 1,
-      'message' => $error,
-    );
-  }
-
-  // Now that lndr does a redirect, e.g. from https://lndr.co/projects/j4Jsm to https://lndr.co/p/pagetitle-f8dc59e687fb8fe0/
-  // We need to use the redirected url as the base for all hte assets, etc.
-  // Lndr issues a redirect from projects/project_id to actual page where resource is.
-  if (property_exists($result, 'redirect_code')) {
-    if ($result->redirect_code == '302' || $result->redirect_code == '301') {
-      $url = $result->redirect_url;
-    }
-  }
-  $project = lndr_find_project_by_prop('origin_url', rtrim($url, '/'));
+function lndr_import_resources($project_id) {
+  $project = lndr_find_project_by_prop('id', $project_id);
   $directory = lndr_get_public_by_project($project);
   file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
 
+  $result = drupal_http_request($url = $project['origin_url']);
   // Start to parse the content.
   module_load_include('inc', 'lndr', 'includes/simple_html_dom');
   $html = str_get_html($result->data);
-
+  if (!$html) {
+    $message = 'Unable to save index file from ' . $url;
+    $variables = array(
+      '%url' => $url,
+    );
+    watchdog('lndr', $message, $variables, WATCHDOG_WARNING, 'node');
+    return;
+  }
   // Saving assets.
   $selectors = implode(', ', array(
     '[data-background-image]',
@@ -656,14 +652,15 @@ drush_print_r(__FUNCTION__);
       }
       $file_path_info = parse_url($element->{$source_attr});
       if (isset($file_path_info['host'])) {
-        // @todo If url is absolute we skips following steps assuming that url is cdn or external etc.
+        // @TODO If url is absolute we skips following steps assuming that url is cdn or external etc.
         continue;
       }
 
       // There might be some inline script we don't care for.
       if (isset($file_path_info['path']) && !empty($file_path_info['path'])) {
-        $source_url = $element->{$source_attr};
-        $resource_file = lndr_save_unmanaged_files($file_path_info['path'], $directory, $url = NULL);
+        // If url is empty, just prepare path.
+        $downlowd_url = (variable_get('lndr_delivery_mode', 'performance') == 'performance' ? $url : NULL);
+        $resource_file = lndr_save_unmanaged_files($file_path_info['path'], $directory, $downlowd_url);
         $element->setAttribute($source_attr, file_create_url($resource_file));
       }
     }
@@ -680,38 +677,63 @@ drush_print_r(__FUNCTION__);
 }
 
 /**
- *
+ * @TODO This shoud be simplified.
  */
 function lndr_save_unmanaged_files($path, $directory, $url = NULL) {
-drush_print_r(__FUNCTION__);
-
   $resource_dir = implode('/', array($directory, trim(dirname($path), '\/')));
   $resource_file = implode('/', array($directory, trim($path, '\/')));
   file_prepare_directory($resource_dir, FILE_CREATE_DIRECTORY);
   if (!is_null($url)) {
-    $resource_data = file_get_contents($url . trim($path, '\/'));
-    file_unmanaged_save_data($resource_data, $resource_file, FILE_EXISTS_REPLACE);
+    $resource_data = file_get_contents($url . '/' . trim($path, '\/'));
+    if ($resource_data !== FALSE) {
+      file_unmanaged_save_data($resource_data, $resource_file, FILE_EXISTS_REPLACE);
+    }
   }
   return $resource_file;
 }
 
 /**
  * Implements hook_node_insert().
+ *
+ * @param object $node
  */
 function lndr_node_insert($node) {
+  module_load_include('inc', 'lndr');
 
+  $lndr_project_id = field_get_items('node', $node, 'lndr_project_id');
+  if (empty($lndr_project_id)) {
+    return;
+  }
+
+  $project = lndr_find_project_by_prop('id', (reset($lndr_project_id))['value']);
+  if (!$project) {
+    return;
+  }
+
+  // Queue will be ran via cron and update all project files.
+  // @see lndr_import_resources().
+  $queue = DrupalQueue::get('lndr_source_feed');
+  $queue->createItem(array($project, $node->nid, TRUE));
 }
 
 /**
  * Implements hook_node_update().
+ *
+ * @param object $node
  */
 function lndr_node_update($node) {
-
+  lndr_node_insert($node);
 }
 
 /**
  * Implements hook_node_delete().
+ *
+ * @param object $node
  */
 function lndr_node_delete($node) {
-
+  $lndr_project_id = field_get_items('node', $node, 'lndr_project_id');
+  if (empty($lndr_project_id)) {
+    return;
+  }
+  file_unmanaged_delete_recursive('public://lndr/' . (reset($lndr_project_id))['value']);
 }

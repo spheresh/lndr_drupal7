@@ -9,9 +9,6 @@
  * Form builder callback.
  */
 function lndr_admin_settings($form, &$form_state) {
-drush_print_r(__FUNCTION__);
-
-
   $form['lndr_token'] = array(
     '#type' => 'textfield',
     '#title' => t('API token'),
@@ -29,8 +26,10 @@ drush_print_r(__FUNCTION__);
     );
   }
   $desc = <<<EOF
-Delivery mode - If some resources haven't prepared via cron, page will be able to render and new sources will be downloaded on client side.<br/>
-Performance mode - Any resources will be delivered via cron only.
+<ul>
+<li>Delivery mode - Only html page will be downloaded via cron. All content will be delivered by client side request.</li>
+<li>Performance mode - All resources will be delivered via cron.</li>
+</ul>
 EOF;
   $form['lndr_delivery_mode'] = array(
     '#type' => 'radios',
@@ -50,8 +49,6 @@ EOF;
  * Form validation handler.
  */
 function lndr_admin_settings_validate($form, &$form_state) {
-drush_print_r(__FUNCTION__);
-
   // Validate the user.
   $options = array(
     'method' => 'POST',

@@ -9,9 +9,6 @@
  * Record and debug the incoming request.
  */
 function lndr_example_service_debug() {
-drush_print_r(__FUNCTION__);
-
-
   $debug = array(
     'date time' => date(('Y-m-d H:i:s')),
     'request_headers' => getallheaders(),
