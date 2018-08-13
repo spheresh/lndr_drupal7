@@ -9,9 +9,6 @@
  * Form builder callback.
  */
 function lndr_admin_settings($form, &$form_state) {
-drush_print_r(__FUNCTION__);
-
-
   $form['lndr_token'] = array(
     '#type' => 'textfield',
     '#title' => t('API token'),
@@ -50,8 +47,6 @@ EOF;
  * Form validation handler.
  */
 function lndr_admin_settings_validate($form, &$form_state) {
-drush_print_r(__FUNCTION__);
-
   // Validate the user.
   $options = array(
     'method' => 'POST',

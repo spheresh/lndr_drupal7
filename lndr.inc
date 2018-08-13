@@ -14,8 +14,6 @@
  *    Reverse parsed url.
  */
 function lndr_get_origin_directory($project) {
-drush_print_r(__FUNCTION__);
-
   $url_parts = explode('/', trim($project["origin_url"], '\/'));
   return array_reverse($url_parts);
 }
@@ -30,8 +28,6 @@ drush_print_r(__FUNCTION__);
  *    Public drupal folder string.
  */
 function lndr_get_public_by_project($project) {
-drush_print_r(__FUNCTION__);
-
   return 'public://lndr/' . $project['id'];
 }
 
@@ -41,7 +37,6 @@ drush_print_r(__FUNCTION__);
  * @return array
  */
 function lndr_get_projects() {
-drush_print_r(__FUNCTION__);
   $result = &drupal_static(__FUNCTION__);
   if (!isset($result)) {
     $result = lndr_client_get_projects();
@@ -60,8 +55,6 @@ drush_print_r(__FUNCTION__);
  * @return array|object|bool
  */
 function lndr_find_project_by_prop($prop, $value) {
-drush_print_r(__FUNCTION__);
-
   $data = lndr_get_projects();
   $search_res = array_search($value, array_column(((array) $data)['projects'], $prop));
   return (FALSE !== $search_res) ? ((array) $data)['projects'][$search_res] : FALSE;
@@ -76,29 +69,7 @@ drush_print_r(__FUNCTION__);
  * @return array|object|bool
  */
 function lndr_find_project_by_url($path) {
-drush_print_r(__FUNCTION__);
-
   return lndr_find_project_by_prop('publish_url', url($path, array('absolute' => TRUE)));
-}
-
-/**
- * Implements hook_load().
- */
-function lndr_load($alias) {
-drush_print_r(__FUNCTION__);
-
-
-  $query = new EntityFieldQuery();
-  $query->entityCondition('entity_type', 'node')
-    ->entityCondition('bundle', LNDR_CT_TYPE)
-    ->fieldCondition('lndr_project_id', 'value', $alias, '=');
-  $result = $query->execute();
-  if (isset($result['node'])) {
-    return node_load(reset($result['node'])->nid);
-  }
-  else {
-    return FALSE;
-  }
 }
 
 /**
@@ -111,15 +82,14 @@ drush_print_r(__FUNCTION__);
  *    File name.
  */
 function lndr_file_transfer($node, $target) {
-drush_print_r(__FUNCTION__);
-
   $lang = $node->language;
   $lndr_project_id = $node->lndr_project_id[$lang][0]['value'];
   $project = lndr_find_project_by_prop('id', $lndr_project_id);
 
   $directory = lndr_get_public_by_project($project);
-  if (!file_exists($image_uri = $directory . '/' . $target)) {
-    lndr_save_unmanaged_files($target, $directory, $project["origin_url"] . '/');
+  $image_uri = $directory . '/' . $target;
+  if (!file_exists($image_uri)) {
+    lndr_save_unmanaged_files($target, $directory, $project['origin_url']);
   }
   $headers = file_download_headers($image_uri);
   // @TODO If headers are empty return MENU_ACCESS_DENIED.
@@ -128,22 +98,7 @@ drush_print_r(__FUNCTION__);
       drupal_add_http_header($name, $value);
     }
   }
-  file_transfer($image_uri, []);
-}
-
-/**
- * Menu callback function.
- *
- * @param $node
- *    Lndr node object.
- */
-function lndr_source_file_deliver($node) {
-drush_print_r(__FUNCTION__);
-
-  $args = func_get_args();
-  array_shift($args);
-  $target = implode('/', $args);
-  lndr_file_transfer($node, $target);
+  file_transfer($image_uri, array());
 }
 
 /**
@@ -157,8 +112,6 @@ drush_print_r(__FUNCTION__);
  * @throws \Exception
  */
 function lndr_reserve_node($path, $lndr_id) {
-drush_print_r(__FUNCTION__);
-
   $node = new stdClass();
   $node->title = $path;
   $node->type = LNDR_CT_TYPE;
@@ -191,8 +144,6 @@ drush_print_r(__FUNCTION__);
  *    Existing path.
  */
 function lndr_check_path_exiting($path) {
-drush_print_r(__FUNCTION__);
-
   return path_load(array('alias' => $path));
 }
 
