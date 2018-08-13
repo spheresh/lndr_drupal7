@@ -9,6 +9,8 @@
  * Migrate all existing lndr pages to nodes
  */
 function lndr_update_7200(&$sandbox) {
+drush_print_r(__FUNCTION__);
+
   // simply invoking lndr_install()
   lndr_install();
 
@@ -47,6 +49,8 @@ function lndr_update_7200(&$sandbox) {
  * @return array
  */
 function _lndr_update_load_alias() {
+drush_print_r(__FUNCTION__);
+
   $data = array();
   $query = db_select('url_alias', 'u')
     ->fields('u', array('pid', 'source', 'alias'))
@@ -69,6 +73,8 @@ function _lndr_update_load_alias() {
  * Implements hook_install
  */
 function lndr_install() {
+drush_print_r(__FUNCTION__);
+
   // Insert default pre-defined node types into the database. For a complete
   // list of available node type attributes, refer to the node type API
   // documentation at: http://api.drupal.org/api/HEAD/function/hook_node_info.
@@ -95,6 +101,8 @@ function lndr_install() {
  * Implements hook_uninstall
  */
 function lndr_uninstall() {
+drush_print_r(__FUNCTION__);
+
   // Remove the node type and all of associated nodes
   $type = 'lndr_page';
   // First, delete nodes
@@ -122,10 +130,14 @@ function lndr_uninstall() {
   // Remove all of the variable set by this module
   variable_del('lndr_token');
   variable_del('lndr_debug_mode');
+  // @TODO We never used this variable.
   variable_del('lndr_api_info');
+  variable_del('lndr_delivery_mode');
 }
 
 function lndr_add_custom_fields() {
+drush_print_r(__FUNCTION__);
+
   foreach (_lndr_installed_fields() as $field) {
     field_create_field($field);
   }
@@ -137,6 +149,8 @@ function lndr_add_custom_fields() {
 }
 
 function lndr_delete_custom_fields() {
+drush_print_r(__FUNCTION__);
+
   foreach (array_keys(_lndr_installed_fields()) as $field) {
     field_delete_field($field);
   }
@@ -147,6 +161,8 @@ function lndr_delete_custom_fields() {
 }
 
 function _lndr_installed_fields() {
+drush_print_r(__FUNCTION__);
+
   $t = get_t();
   return array(
     'lndr_project_id' => array(
@@ -158,6 +174,8 @@ function _lndr_installed_fields() {
 }
 
 function _lndr_installed_instances() {
+drush_print_r(__FUNCTION__);
+
   $t = get_t();
   return array(
     'lndr_project_id' => array(

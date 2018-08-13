@@ -1,0 +1,121 @@
+<?php
+/**
+ * @file
+ * Drupal needs this blank file.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function lndr_example_menu() {
+drush_print_r(__FUNCTION__);
+
+
+  // Links for development testing.
+  $items['examples/lndr'] = array(
+    'title' => 'Test Lndr pages',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('lndr_example'),
+    'access arguments' => array('administer nodes'),
+    'type' => MENU_CALLBACK,
+    'file' => 'lndr.example.inc',
+  );
+
+  $items['examples/lndr/render'] = array(
+    'title' => 'Test Lndr pages',
+    'page callback' => 'lndr_example_render',
+    'access arguments' => array('administer nodes'),
+    'type' => MENU_CALLBACK,
+    'file' => 'lndr.example.inc',
+  );
+
+  $items['examples/lndr/service'] = array(
+    'title' => 'Test Lndr service',
+    'page callback' => 'lndr_example_service',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'file' => 'lndr.example.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Import a page from lndr for rendering in Drupal.
+ *
+ * @param $url
+ *
+ * @return array
+ */
+function _lndr_import_page($url) {
+drush_print_r(__FUNCTION__);
+
+
+  $result = drupal_http_request($url);
+
+  // Error with fetching the url.
+  if ($result->code != '200') {
+    $message = 'Lndr was unable to fetch the url: %url with code: %code and error: %error';
+    $variables = array(
+      '%url' => $url,
+      '%code' => $result->code,
+      '%error' => $result->error,
+    );
+    watchdog('lndr', $message, $variables, WATCHDOG_WARNING, 'node');
+    $error = t('Unable to fetch the url given, please check the logs for more details');
+    return array(
+      'error' => 1,
+      'message' => $error,
+    );
+  }
+
+  // Now that lndr does a redirect, e.g. from https://lndr.co/projects/j4Jsm to https://lndr.co/p/pagetitle-f8dc59e687fb8fe0/
+  // We need to use the redirected url as the base for all hte assets, etc.
+  // Lndr issues a redirect from projects/project_id to actual page where resource is.
+  if (property_exists($result, 'redirect_code')) {
+    if ($result->redirect_code == '302' || $result->redirect_code == '301') {
+      $url = $result->redirect_url;
+    }
+  }
+
+  // Start to parse the content.
+  module_load_include('inc', 'lndr', 'includes/simple_html_dom');
+  $html = str_get_html($result->data);
+
+  // Prepend the url of the page to all of the images.
+  foreach ($html->find('img') as $key => $element) {
+    $src = $element->src;
+    $html->find('img', $key)->src = $url . $src;
+  }
+
+  // Prepend url to internal stylesheets.
+  foreach ($html->find('link[rel="stylesheet"]') as $key => $element) {
+    if (substr($element->href, 0, 4) !== 'http') {
+      $html->find('link[rel="stylesheet"]', $key)->href = $url . $element->href;
+    }
+  }
+
+  // Prepend javascripts (assuming all are internal javascript)
+  foreach ($html->find('script') as $key => $element) {
+    $src = $element->src;
+    if (isset($src)) {
+      $html->find('script', $key)->src = $url . $src;
+    }
+  }
+
+  $elements = array(
+    'div',
+    'a',
+    'section',
+  );
+
+  foreach ($elements as $element) {
+    foreach ($html->find($element . '[data-background-image]') as $key => $_element) {
+      $bg_image = $_element->{'data-background-image'};
+      $html->find($element . '[data-background-image]', $key)->{'data-background-image'} = $url . $bg_image;
+    }
+  }
+
+  print $html;
+  drupal_exit();
+}
