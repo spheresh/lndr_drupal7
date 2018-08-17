@@ -17,7 +17,7 @@ function lndr_admin_settings($form, &$form_state) {
     '#required' => TRUE,
   );
 
-  if (module_exists('lndr_debug')) {
+  if (module_exists('lndr_example')) {
     $form['lndr_debug_mode'] = array(
       '#type' => 'checkbox',
       '#title' => t('Developer mode'),
