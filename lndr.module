@@ -19,30 +19,30 @@ define('LNDR_CT_TYPE', 'lndr_page');
  *
  * @return null|string
  */
-function lndr_help($path, $arg = array()) {
+function lndr_help($path, $arg = []) {
 
   switch ($path) {
     case 'admin/config/content/lndr':
-      return t('Please refer to the <a href="@lndr-help">Lndr help page</a> on how to use this module', array('@lndr-help' => base_path() . 'admin/help/lndr'));
+      return t('Please refer to the <a href="@lndr-help">Lndr help page</a> on how to use this module', ['@lndr-help' => base_path() . 'admin/help/lndr']);
 
     case 'admin/help#lndr':
       $output = '';
       $output .= '<h3>' . t('About Lndr') . '</h3>';
-      $output .= '<p>' . t('This module allows you to publish Lndr landing pages to Drupal 8 websites, for more information, please go to <a href="@lndr-home">http://www.lndr.co</a>.', array('@lndr-home' => 'http://www.lndr.co')) . '</p>';
+      $output .= '<p>' . t('This module allows you to publish Lndr landing pages to Drupal 8 websites, for more information, please go to <a href="@lndr-home">http://www.lndr.co</a>.', ['@lndr-home' => 'http://www.lndr.co']) . '</p>';
       $output .= '<h3>' . t('Before you start') . '</h3>';
       $output .= '<p>' . t('You will need a Lndr user account which you can obtain from http://www.lndr.co') . '</p>';
       $output .= '<h3>' . t('How to use the module') . '</h3>';
       $output .= '<dl>';
       $output .= '<dt>' . t('Configuring the module') . '</dt>';
-      $output .= '<dd>' . t('You can find the configuration page for Lndr under Administration > Configuration > Content authoring or <a href="@lndr">Lndr configuration page</a>.', array('@lndr' => base_path() . 'admin/config/content/lndr')) . '</dd>';
-      $output .= '<dd>' . t('You can find the API token for Lndr under your <a href="@lndr-user">user profile in Lndr</a>.', array('@lndr-user' => 'https://www.lndr.co/users/edit')) . '</dd>';
+      $output .= '<dd>' . t('You can find the configuration page for Lndr under Administration > Configuration > Content authoring or <a href="@lndr">Lndr configuration page</a>.', ['@lndr' => base_path() . 'admin/config/content/lndr']) . '</dd>';
+      $output .= '<dd>' . t('You can find the API token for Lndr under your <a href="@lndr-user">user profile in Lndr</a>.', ['@lndr-user' => 'https://www.lndr.co/users/edit']) . '</dd>';
       $output .= '<dt>' . t('Using the module') . '</dt>';
       $output .= '<dd>' . t('Generally, you do not need to actively use this module once it has been successfully configured. There might be some exceptions such as changing the API token.') . '</dd>';
       $output .= '<dd>' . t('If your landing page created for Drupal does not show up, you can always run the Drupal cron manually to trigger the page sync.') . '</dd>';
-      $output .= '<dd>' . t('Your landing page created for Drupal can be found under the <a href="@url-alias">URL alias</a> section', array('@url-alias' => base_path() . 'admin/config/search/path')) . '</dd>';
+      $output .= '<dd>' . t('Your landing page created for Drupal can be found under the <a href="@url-alias">URL alias</a> section', ['@url-alias' => base_path() . 'admin/config/search/path']) . '</dd>';
       $output .= '<dd>' . t('Lndr pages in Drupal will appear in the URL alias as /lndr/[id]') . '</dd>';
       $output .= '</dl>';
-      $output .= '<p>' . t('For more information, contact <a href="@lndr-support">support@lndr.co</a>', array('@lndr-support' => 'mailto:support@lndr.co')) . '</p>';
+      $output .= '<p>' . t('For more information, contact <a href="@lndr-support">support@lndr.co</a>', ['@lndr-support' => 'mailto:support@lndr.co']) . '</p>';
       return $output;
   }
 }
@@ -60,12 +60,12 @@ function lndr_init() {
   }
   if ($page_match) {
     // Let's add our CORS headers.
-    $headers = array(
+    $headers = [
       'Access-Control-Allow-Origin' => '*',
       'Access-Control-Allow-Credentials' => TRUE,
       'Access-Control-Allow-Methods' => 'GET, POST',
       'Access-Control-Allow-Headers' => 'Authorization',
-    );
+    ];
     foreach ($headers as $header => $value) {
       drupal_add_http_header($header, $value, TRUE);
     }
@@ -80,26 +80,26 @@ function lndr_init() {
  */
 function lndr_menu() {
 
-  $items['admin/config/content/lndr'] = array(
+  $items['admin/config/content/lndr'] = [
     'title' => 'Lndr: Landing Page Builder',
     'description' => 'Manage configuration for lndr',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('lndr_admin_settings'),
-    'access arguments' => array('administer nodes'),
+    'page arguments' => ['lndr_admin_settings'],
+    'access arguments' => ['administer nodes'],
     'type' => MENU_NORMAL_ITEM,
     'file' => 'lndr.admin.inc',
-  );
+  ];
 
   // If source URLs are unavailable, source should be always be served through
   // the menu system.
   $directory_path = file_stream_wrapper_get_instance_by_scheme('public')->getDirectoryPath();
-  $items[$directory_path . '/lndr/%lndr'] = array(
+  $items[$directory_path . '/lndr/%lndr'] = [
     'title' => 'Lndr source processor',
     'page callback' => 'lndr_source_file_deliver',
-    'page arguments' => array(count(explode('/', $directory_path)) + 1),
+    'page arguments' => [count(explode('/', $directory_path)) + 1],
     'access callback' => TRUE,
     'type' => MENU_CALLBACK,
-  );
+  ];
 
   // Links for URL validation and API method.
   $items['lndr_sync/%node'] = [
@@ -112,28 +112,28 @@ function lndr_menu() {
   ];
 
   // Drupal API to check URL availability.
-  $items['service/lndr/validate_path'] = array(
+  $items['service/lndr/validate_path'] = [
     'title' => 'Check URI availability',
     'page callback' => 'lndr_validate_path',
-    'access arguments' => array('access content'),
+    'access arguments' => ['access content'],
     'type' => MENU_CALLBACK,
-  );
+  ];
 
   // Drupal API to reserve URL/path.
-  $items['service/lndr/reserve_path'] = array(
+  $items['service/lndr/reserve_path'] = [
     'title' => 'Check URI availability',
     'page callback' => 'lndr_reserve_path',
-    'access arguments' => array('access content'),
+    'access arguments' => ['access content'],
     'type' => MENU_CALLBACK,
-  );
+  ];
 
   // Drupal API to sync contents from Lndr.
-  $items['service/lndr/sync_content'] = array(
+  $items['service/lndr/sync_content'] = [
     'title' => 'Sync Lndr pages',
     'page callback' => 'lndr_sync_content',
-    'access arguments' => array('access content'),
+    'access arguments' => ['access content'],
     'type' => MENU_CALLBACK,
-  );
+  ];
 
   return $items;
 }
@@ -246,10 +246,10 @@ function lndr_cron() {
  * Implements hook_cron_queue_info().
  */
 function lndr_cron_queue_info() {
-  $queues['lndr_source_feed'] = array(
+  $queues['lndr_source_feed'] = [
     'worker callback' => 'lndr_source_refresh',
     'time' => 60,
-  );
+  ];
   return $queues;
 }
 
@@ -309,10 +309,10 @@ function lndr_client_get_projects() {
   // @todo: bad token should be a 403 with message, not 500, implement on Lndr
   if ($result->code !== '200') {
     $message = 'Drupal was unable to create the page with code: %code and error: %error';
-    $variables = array(
+    $variables = [
       '%code' => $result->code,
       '%error' => $result->error,
-    );
+    ];
     watchdog('lndr', $message, $variables, WATCHDOG_WARNING, 'admin/config/content/lndr');
     // @todo: is there another persistent way to add a message to alert admins about this, ideally add a message like there's a security updates.
     return FALSE;
@@ -442,7 +442,8 @@ function lndr_add_new_queue_list($project) {
  * Check whether a path alias is available.
  *
  * @deprecated
- *   Currently, Lndr allows to continue creating page even a validation was failed.
+ *   Currently, Lndr allows to continue creating page even a validation was
+ *   failed.
  */
 function lndr_validate_path() {
   module_load_include('inc', 'lndr');
@@ -460,24 +461,24 @@ function lndr_validate_path() {
   $path = trim($query['path'], '/');
   $existing_path = lndr_check_path_existing($path);
   if (empty($existing_path)) {
-    $response = array(
-      'response' => array(
+    $response = [
+      'response' => [
         'type' => 'path_valid',
         'message' => 'The chosen path is available',
         'code' => '200',
-      ),
-    );
+      ],
+    ];
     drupal_json_output($response);
     drupal_exit();
   }
   else {
-    $response = array(
-      'response' => array(
+    $response = [
+      'response' => [
         'type' => 'path_taken',
         'message' => 'The requested path is not available for Lndr',
         'code' => '403',
-      ),
-    );
+      ],
+    ];
     drupal_json_output($response);
     drupal_exit();
   }
@@ -518,7 +519,7 @@ function lndr_reserve_path() {
  * Helper function that loads all of the nodes that have a lndr project ID.
  */
 function _lndr_load_nodes() {
-  $nodes = array();
+  $nodes = [];
 
   $query = new EntityFieldQuery();
   $query->entityCondition('entity_type', 'node')
@@ -546,13 +547,13 @@ function lndr_sync_content() {
     drupal_exit();
   }
   lndr_sync_path();
-  $response = array(
-    'response' => array(
+  $response = [
+    'response' => [
       'type' => 'content_synced',
       'message' => 'Content successfully synced',
       'code' => '200',
-    ),
-  );
+    ],
+  ];
   drupal_json_output($response);
   drupal_exit();
 }
@@ -594,68 +595,71 @@ function _lndr_service_base($check_path = TRUE) {
 
   if (!array_key_exists('Authorization', $headers)) {
     // No token exist.
-    $response = array(
-      'response' => array(
+    $response = [
+      'response' => [
         'type' => 'error',
         'message' => t('No token in the request header'),
         'code' => '403',
-      ),
-    );
+      ],
+    ];
     return $response;
   }
   $api_token = variable_get('lndr_token', '');
   if ($api_token === '') {
     // No token set in Drupal yet.
-    $response = array(
-      'response' => array(
+    $response = [
+      'response' => [
         'type' => 'error',
         'message' => t('No API token configured in Drupal'),
         'code' => '403',
-      ),
-    );
+      ],
+    ];
     return $response;
   }
 
   $authorization = str_replace('Token token=', '', $headers['Authorization']);
   if ($api_token !== $authorization) {
     // Invalid token given.
-    $response = array(
-      'response' => array(
+    $response = [
+      'response' => [
         'type' => 'error',
         'message' => t('Invalid token given'),
         'code' => '403',
-      ),
-    );
+      ],
+    ];
     return $response;
   }
 
   $query = drupal_get_query_parameters();
   if ($check_path === TRUE) {
     if (!array_key_exists('path', $query)) {
-      $response = array(
-        'response' => array(
+      $response = [
+        'response' => [
           'type' => 'error',
           'message' => t('Required parameter path not given'),
           'code' => '403',
-        ),
-      );
+        ],
+      ];
       return $response;
     }
   }
 
   // If everything checks out, we just pass the query back.
-  $response = array(
-    'response' => array(
+  $response = [
+    'response' => [
       'type' => 'status',
       'message' => $query,
       'code' => '200',
-    ),
-  );
+    ],
+  ];
   return $response;
 }
 
 /**
  * Parsing resources.
+ *
+ * @param $project
+ * @param bool $force
  *
  * @return array
  */
@@ -669,22 +673,22 @@ function lndr_import_resources($project, $force = FALSE) {
   $html = str_get_html($result->data);
   if (!$html) {
     $message = 'Unable to save index file from ' . $url;
-    $variables = array(
+    $variables = [
       '%url' => $url,
-    );
+    ];
     watchdog('lndr', $message, $variables, WATCHDOG_WARNING, 'node');
     return;
   }
   // Saving assets.
-  $selectors = implode(', ', array(
+  $selectors = implode(', ', [
     '[data-background-image]',
     'img',
     'link[rel="stylesheet"]',
     'script',
-  ));
+  ]);
   foreach ($html->find($selectors) as $key => $element) {
     /* @var \simple_html_dom_node $element */
-    foreach (array('src', 'href', 'data-background-image') as $source_attr) {
+    foreach (['src', 'href', 'data-background-image'] as $source_attr) {
       if (!$element->hasAttribute($source_attr)) {
         continue;
       }
@@ -708,9 +712,9 @@ function lndr_import_resources($project, $force = FALSE) {
   touch($directory . '/index.html', strtotime($result->headers["last-modified"]));
   if (!$file_saved) {
     $message = 'Unable to save index file from ' . $url;
-    $variables = array(
+    $variables = [
       '%url' => $url,
-    );
+    ];
     watchdog('lndr', $message, $variables, WATCHDOG_WARNING, 'node');
   }
   return $resource_files;
@@ -718,7 +722,14 @@ function lndr_import_resources($project, $force = FALSE) {
 }
 
 /**
- * @TODO This shoud be simplified.
+ * Storing unmanaged file.
+ *
+ * @param $path
+ * @param $directory
+ * @param null $url
+ * @param string $last_modified
+ *
+ * @return string
  */
 function lndr_save_unmanaged_files($path, $directory, $url = NULL, $last_modified = 'now') {
   $path = trim($path, '/');
