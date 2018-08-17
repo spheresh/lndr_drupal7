@@ -79,5 +79,5 @@ function lndr_example_render() {
 function lndr_example_service() {
   $path = drupal_get_path('module', 'lndr_example') . '/lndr_test.json';
   $data = file_get_contents($path);
-  print $data;
+  return $data;
 }

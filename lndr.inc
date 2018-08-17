@@ -90,7 +90,10 @@ function lndr_file_transfer($node, $target) {
   $directory = lndr_get_public_by_project($project);
   $image_uri = $directory . '/' . $target;
   if (!file_exists($image_uri)) {
-    lndr_save_unmanaged_files($target, $directory, $project['origin_url']);
+    $files = lndr_save_unmanaged_files($target, $directory, $project['origin_url']);
+    if (empty($files)) {
+      return MENU_NOT_FOUND;
+    }
   }
   $headers = file_download_headers($image_uri);
   // @TODO If headers are empty return MENU_ACCESS_DENIED.
@@ -106,18 +109,28 @@ function lndr_file_transfer($node, $target) {
  * Create an unpublished node to hold the URL path
  * string $path.
  *
- * @param string $path
- * @param string $lndr_id
+ * @param string|null $path
+ * @param string|null $lndr_id
+ * @param string|null $project
+ * @param object|null $node
  *
  * @return \stdClass
  *
  * @throws \Exception
  */
-function lndr_reserve_node($path, $lndr_id) {
-  $node = new stdClass();
-  $node->title = $path;
-  $node->type = LNDR_CT_TYPE;
-  node_object_prepare($node);
+function lndr_reserve_node($path = NULL, $project = NULL, $node = NULL) {
+  global $base_url;
+  if (is_null($path) && is_null($project) && is_null($node)) {
+    throw new Exception('Incorrect function arguments.');
+  }
+  if (is_null($node)) {
+    $node = new stdClass();
+    $node->type = LNDR_CT_TYPE;
+    node_object_prepare($node);
+  }
+  elseif (!is_object($node)) {
+    throw new Exception('Something before went wrong.');
+  }
 
   // @TODO These three properties will be overridden, but it cen be defined by default content type configuration.
   // @see node_object_prepare().
@@ -127,11 +140,25 @@ function lndr_reserve_node($path, $lndr_id) {
   $node->promote = 0;
 
   $node->language = LANGUAGE_NONE;
-  $node->lndr_project_id[$node->language] = array(
-    array('value' => $lndr_id),
-  );
 
-  $node->path['alias'] = $path;
+  if (!is_null($path)) {
+    $node->title = $path;
+    $node->path['alias'] = $path;
+  }
+
+  if (!is_null($project)) {
+    $node->lndr_project_id[$node->language] = array(
+      array('value' => $project['id']),
+    );
+    $node->title = $project['title'];
+
+    $path = ltrim(substr($project['publish_url'], strlen($base_url)), '/');
+    $node->path['alias'] = $path;
+
+    $node->created = (new DateTime($project['created_at']))->getTimestamp();
+    $node->changed = (new DateTime($project['updated_at']))->getTimestamp();
+    $node->changed_project = (new DateTime($project['updated_at']))->getTimestamp();
+  }
   node_save($node);
 
   return $node;

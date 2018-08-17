@@ -25,24 +25,37 @@ function lndr_admin_settings($form, &$form_state) {
       '#description' => t('Turn this on to test Lndr API data from local source instead of executing real API call'),
     );
   }
-  $desc = <<<EOF
-<ul>
-<li>Delivery mode - Only html page will be downloaded via cron. All content will be delivered by client side request.</li>
-<li>Performance mode - All resources will be delivered via cron.</li>
-</ul>
-EOF;
+
   $form['lndr_delivery_mode'] = array(
     '#type' => 'radios',
-    '#title' => t('Delivery mode'),
+    '#title' => t('Content import mode'),
     '#options' => array(
-      'delivery' => t('Delivery'),
-      'performance' => t('Performance'),
+      'content_only' => t('Content only (fastest)'),
+      'all_assets' => t('All content and assets'),
     ),
-    '#default_value' => variable_get('lndr_delivery_mode', 'performance'),
-    '#description' => t($desc),
+    '#options_descriptions' => array(
+      'content_only' => 'We will only import the index.html file while loading images and other assets from the Lndr server',
+      'all_assets' => 'All of the Lndr page content and assets from the Lndr server will be imported to the Drupal website in your public file directory',
+    ),
+    '#after_build' => array('_lndr_option_descriptions'),
+    '#default_value' => variable_get('lndr_delivery_mode', 'all_assets'),
   );
 
   return system_settings_form($form);
+}
+
+/**
+ * Provide a description to each option in the element.
+ */
+function _lndr_option_descriptions($element, &$form_state) {
+  foreach (element_children($element) as $key) {
+    if (isset($element['#options_descriptions'][$key])) {
+      $element[$key]['#description'] = t('!description', array(
+        '!description' => $element['#options_descriptions'][$key],
+      ));
+    }
+  }
+  return $element;
 }
 
 /**
@@ -56,7 +69,10 @@ function lndr_admin_settings_validate($form, &$form_state) {
   );
   $request = drupal_http_request(LNDR_API_VALIDATE_TOKEN, $options);
   if ($request->code !== '200') {
-    form_set_error('lndr_token', t('You have entered an invalid API token, please copy and paste the API token from your profile in Lndr'));
+    form_set_error(
+      'lndr_token',
+      t('You have entered an invalid API token, please copy and paste the API token from your profile in Lndr')
+    );
   }
   else {
     // @todo: in the future we can do additional check such as see if that user is inactive, etc.
