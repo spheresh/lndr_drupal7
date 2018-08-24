@@ -56,9 +56,9 @@ function lndr_get_projects() {
  * @return array|object|bool
  */
 function lndr_find_project_by_prop($prop, $value) {
-  $data = lndr_get_projects();
-  $search_res = array_search($value, array_column(((array) $data)['projects'], $prop));
-  return (FALSE !== $search_res) ? ((array) $data)['projects'][$search_res] : FALSE;
+  $data = (array) lndr_get_projects();
+  $search_res = array_search($value, array_column($data['projects'], $prop));
+  return (FALSE !== $search_res) ? $data['projects'][$search_res] : FALSE;
 }
 
 /**
@@ -188,4 +188,36 @@ function lndr_update_node($nid, $path) {
   $node_to_be_updated = node_load($nid);
   $node_to_be_updated->path['alias'] = $path;
   node_save($node_to_be_updated);
+}
+
+/**
+ * Custom parse url for 5.3 compatibility.
+ */
+function lndr_parse_url($url) {
+  $to_unset = array();
+  $url = strval($url);
+
+  if ('//' === substr($url, 0, 2)) {
+    $to_unset[] = 'scheme';
+    $url = 'placeholder:' . $url;
+  }
+  elseif ('/' === substr($url, 0, 1)) {
+    $to_unset[] = 'scheme';
+    $to_unset[] = 'host';
+    $url = 'placeholder://placeholder' . $url;
+  }
+
+  $parts = @parse_url($url);
+
+  if (FALSE === $parts) {
+    // Parsing failure.
+    return $parts;
+  }
+
+  // Remove the placeholder values.
+  foreach ($to_unset as $key) {
+    unset($parts[$key]);
+  }
+
+  return $parts;
 }

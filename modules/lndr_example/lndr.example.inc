@@ -37,10 +37,11 @@ function lndr_example($form, &$form_state) {
  * @param $form_state
  */
 function lndr_example_validate($form, &$form_state) {
+  module_load_include('inc', 'lndr');
   if (!valid_url($form_state['values']['lndr_example_url'], TRUE)) {
     form_set_error('lndr_example_url', t('Please enter a valid URL'));
   }
-  $internal_url = drupal_parse_url($form_state['values']['lndr_example_url']);
+  $internal_url = lndr_parse_url($form_state['values']['lndr_example_url']);
   if (substr($internal_url['path'], 0, strlen(LNDR_BASE_PUBLISHED)) != LNDR_BASE_PUBLISHED) {
     form_set_error('lndr_example_url', t('only lndr specific URLs can be used, it should start with @url', array('@url' => LNDR_BASE_PUBLISHED)));
   }

@@ -150,8 +150,8 @@ function lndr_load($alias) {
   $result = $query->execute();
   if (isset($result['node']) && !empty($result['node'])) {
     $nid = reset($result['node']);
-    $node = node_load($nid);
-    return (FALSE == $node ? $node->nid : FALSE);
+    $node = node_load($nid->nid);
+    return (FALSE !== $node ? $node : FALSE);
   }
   else {
     return FALSE;
@@ -669,6 +669,8 @@ function lndr_import_resources($project, $force = FALSE) {
   $result = drupal_http_request($url = $project['origin_url']);
   // Start to parse the content.
   module_load_include('inc', 'lndr', 'includes/simple_html_dom');
+  module_load_include('inc', 'lndr');
+
   $html = str_get_html($result->data);
   if (!$html) {
     $message = 'Unable to save index file from ' . $url;
@@ -691,7 +693,7 @@ function lndr_import_resources($project, $force = FALSE) {
       if (!$element->hasAttribute($source_attr)) {
         continue;
       }
-      $file_path_info = parse_url($element->{$source_attr});
+      $file_path_info = lndr_parse_url($element->{$source_attr});
       if (isset($file_path_info['host'])) {
         // @TODO If url is absolute we skips following steps assuming that url is cdn or external etc.
         continue;
