@@ -48,7 +48,8 @@ function lndr_help($path, $arg = array()) {
 }
 
 /**
- * Implements hook_init
+ * Implements hook_init().
+ *
  * Enable cross-domain request for the API path.
  */
 function lndr_init() {
@@ -76,7 +77,7 @@ function lndr_init() {
 }
 
 /**
- * Implements hook_menu.
+ * Implements hook_menu().
  */
 function lndr_menu() {
 
@@ -160,8 +161,10 @@ function lndr_load($alias) {
 /**
  * Menu callback function.
  *
- * @param $node
+ * @param object $node
  *   Lndr node object.
+ *
+ * @return int
  */
 function lndr_source_file_deliver($node) {
   if (variable_get('lndr_delivery_mode', 'all_assets') == 'all_assets') {
@@ -169,7 +172,7 @@ function lndr_source_file_deliver($node) {
     $args = func_get_args();
     array_shift($args);
     $target = implode('/', $args);
-    return lndr_file_transfer($node, $target);
+    lndr_file_transfer($node, $target);
   }
   else {
     return MENU_NOT_FOUND;
@@ -177,9 +180,7 @@ function lndr_source_file_deliver($node) {
 }
 
 /**
- * Implements hook_menu_alter.
- *
- * @param $items
+ * Implements hook_menu_alter().
  */
 function lndr_menu_alter(&$items) {
   // @todo: not the best approach, however, sufficient for a POC.
@@ -187,11 +188,7 @@ function lndr_menu_alter(&$items) {
 }
 
 /**
- * Implements hook_form_FORM_ID_alter.
- *
- * @param $form
- * @param $form_state
- * @param $form_id
+ * Implements hook_form_FORM_ID_alter().
  */
 function lndr_form_node_admin_content_alter(&$form, &$form_state, $form_id) {
   $nodes = $form['admin']['nodes']['#options'];
@@ -210,7 +207,7 @@ function lndr_form_node_admin_content_alter(&$form, &$form_state, $form_id) {
  *
  * @TODO it still doesn't look as better approach to override page callback.
  *
- * @param $node
+ * @param object $node
  *   A stdClass node object.
  *
  * @return array
@@ -237,9 +234,7 @@ function lndr_custom_node_view($node) {
 }
 
 /**
- * Implements hook_cron.
- *
- * @throws \Exception
+ * Implements hook_cron().
  */
 function lndr_cron() {
   lndr_sync_path();
@@ -403,7 +398,8 @@ function _lndr_upsert_alias($projects) {
     }
 
   }
-  // A lndr_project_id field is required, so we can delete all node with an empty field.
+  // A lndr_project_id field is required, so we can delete all node with
+  // an empty field.
   node_delete_multiple(array_merge($empty_projects_node, $deprecated_projects));
 
   foreach ($new_candidate_projects as $project_id => $project) {
@@ -586,8 +582,7 @@ function _lndr_getallheaders() {
 }
 
 /**
- * Helper to check incoming token and others for
- * path checking and reservation.
+ * Helper to check incoming token and others for path checking and reservation.
  *
  * @param bool
  *
@@ -665,7 +660,7 @@ function _lndr_service_base($check_path = TRUE) {
  * @param $project
  * @param bool $force
  *
- * @return array
+ * @return array|false
  */
 function lndr_import_resources($project, $force = FALSE) {
   $directory = lndr_get_public_by_project($project);
@@ -681,7 +676,7 @@ function lndr_import_resources($project, $force = FALSE) {
       '%url' => $url,
     );
     watchdog('lndr', $message, $variables, WATCHDOG_WARNING, 'node');
-    return;
+    return FALSE;
   }
   // Saving assets.
   $selectors = implode(', ', array(
@@ -730,7 +725,7 @@ function lndr_import_resources($project, $force = FALSE) {
  *
  * @param $path
  * @param $directory
- * @param null $url
+ * @param string $url
  * @param string $last_modified
  *
  * @return string
@@ -774,8 +769,6 @@ function lndr_node_presave($node) {
 
 /**
  * Implements hook_node_delete().
- *
- * @param object $node
  */
 function lndr_node_delete($node) {
   $project_id_field_array = field_get_items('node', $node, 'lndr_project_id');

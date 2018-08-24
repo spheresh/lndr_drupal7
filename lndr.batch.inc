@@ -2,26 +2,25 @@
 
 /**
  * @file
- * $Lndr batch functions.
+ * Lndr batch functions.
  */
 
 /**
  * Manually process all of the path syncing.
  *
- * @return mixed
+ * @param object $node
  */
 function lndr_sync($node) {
   $function = 'lndr_sync_batch';
   $batch = $function($node->nid);
   batch_set($batch);
-  return batch_process('');
+  batch_process('');
 }
 
 /**
- * In Drupal 7, this is the a separate batch command where we
- * iterate through the number of operations.
+ * Separate batch command where we iterate through the number of operations.
  *
- * @param $nid
+ * @param int $nid
  *
  * @return array
  */
@@ -83,7 +82,6 @@ function lndr_sync_batch_operation($uri, $nid, $project, &$context) {
     'nid' => $nid,
     'project_id' => $project['id'],
   );
-  return;
 }
 
 /**
@@ -99,8 +97,9 @@ function lndr_sync_batch_finished($success, $results, $operations) {
   if ($success) {
     module_load_include('inc', 'lndr');
     drupal_set_message(t('Finished deploying Lndr pages.'));
-    // If we were sent from a placeholder (/lndr/reserved => path) but the page has been
-    // published, we redirect back to that alias so user can see the published page.
+    // If we were sent from a placeholder (/lndr/reserved => path),
+    // but the page has been published, we redirect back to that alias,
+    // so user can see the published page.
     if ($success && isset($results["node_updated"]) && is_numeric($results["node_updated"]['nid'])) {
       $node = node_load($results["node_updated"]['nid']);
       $project = lndr_find_project_by_prop('id', $results["node_updated"]['project_id']);
