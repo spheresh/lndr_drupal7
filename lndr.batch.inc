@@ -79,10 +79,10 @@ function lndr_sync_source_refresh_callback($uri, $project) {
  */
 function lndr_sync_batch_operation($uri, $nid, $project, &$context) {
   lndr_sync_source_refresh_callback($uri, $project);
-  $context['results']["node_updated"] = [
+  $context['results']["node_updated"] = array(
     'nid' => $nid,
     'project_id' => $project['id'],
-  ];
+  );
   return;
 }
 
