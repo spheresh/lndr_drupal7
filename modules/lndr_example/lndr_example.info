@@ -1,0 +1,4 @@
+name = Lndr (Example)
+core = 7.x
+package = Lndr
+dependencies[] = lndr

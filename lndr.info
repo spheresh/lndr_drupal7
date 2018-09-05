@@ -1,8 +1,9 @@
 name = Lndr landing page agent
 description = Allow deployment of landing pages from Lndr to Drupal websites
 core = 7.x
-package = Others
+package = Lndr
 version = 7.x-2.0
 configure = admin/config/content/lndr
 dependencies[] = path
 dependencies[] = field
+files[] = lndr.inc
