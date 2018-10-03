@@ -342,7 +342,6 @@ function lndr_sync_path() {
  * @throws \Exception
  */
 function _lndr_upsert_alias($projects) {
-  global $base_url;
   module_load_include('inc', 'lndr');
   $new_candidate_projects = array();
   $updated_projects = array();
@@ -361,7 +360,6 @@ function _lndr_upsert_alias($projects) {
   }
 
   foreach ($nodes as $node) {
-    $project = FALSE;
     $project_id_field_array = field_get_items('node', $node, 'lndr_project_id');
     if (empty($project_id_field_array)) {
       $alias = drupal_lookup_path('alias', 'node/' . $node->nid, LANGUAGE_NONE);
@@ -376,7 +374,7 @@ function _lndr_upsert_alias($projects) {
       $project = lndr_find_project_by_prop('id', ($project_id));
     }
     if ($project !== FALSE) {
-      if ($project['published'] && substr($project['publish_url'], 0, strlen($base_url)) === $base_url) {
+      if ($project['published'] && substr($project['publish_url'], 0, strlen(lndr_get_base_url())) === lndr_get_base_url()) {
         $project_datetime = new DateTime($project["updated_at"]);
         if (!$project_id_field_array || $project_datetime->getTimestamp() > $node->changed) {
           $updated_projects[] = array($node, $project);
@@ -403,7 +401,7 @@ function _lndr_upsert_alias($projects) {
   node_delete_multiple(array_merge($empty_projects_node, $deprecated_projects));
 
   foreach ($new_candidate_projects as $project_id => $project) {
-    if ($project['published'] && substr($project['publish_url'], 0, strlen($base_url)) === $base_url) {
+    if ($project['published'] && substr($project['publish_url'], 0, strlen(lndr_get_base_url())) === lndr_get_base_url()) {
       $node = lndr_reserve_node(NULL, $project);
       if ($node != FALSE) {
         // @TODO Otherwise throw some error.
@@ -783,4 +781,12 @@ function lndr_node_delete($node) {
   }
 
   file_unmanaged_delete_recursive('public://lndr/' . $field['value']);
+}
+
+/**
+ * Gets a base url.
+ */
+function lndr_get_base_url() {
+  global $base_url;
+  return variable_get('lndr_base_url', $base_url);
 }

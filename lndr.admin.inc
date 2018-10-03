@@ -9,6 +9,15 @@
  * Form builder callback.
  */
 function lndr_admin_settings($form, &$form_state) {
+  global $base_url;
+  $form['lndr_base_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Base URL'),
+    '#default_value' => variable_get('lndr_base_url', $base_url),
+    '#description' => t("Allows to override a base url setting."),
+    '#required' => TRUE,
+  );
+
   $form['lndr_token'] = array(
     '#type' => 'textfield',
     '#title' => t('API token'),

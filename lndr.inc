@@ -119,7 +119,7 @@ function lndr_file_transfer($node, $target) {
  * @throws \Exception
  */
 function lndr_reserve_node($path = NULL, $project = NULL, $node = NULL) {
-  global $base_url;
+
   if (is_null($path) && is_null($project) && is_null($node)) {
     throw new Exception('Incorrect function arguments.');
   }
