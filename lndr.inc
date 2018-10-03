@@ -152,12 +152,13 @@ function lndr_reserve_node($path = NULL, $project = NULL, $node = NULL) {
     );
     $node->title = $project['title'];
 
-    $path = ltrim(substr($project['publish_url'], strlen($base_url)), '/');
+    $path = ltrim(substr($project['publish_url'], strlen(lndr_get_base_url())), '/');
     $node->path['alias'] = $path;
-
-    $node->created = (new DateTime($project['created_at']))->getTimestamp();
-    $node->changed = (new DateTime($project['updated_at']))->getTimestamp();
-    $node->changed_project = (new DateTime($project['updated_at']))->getTimestamp();
+    $created_at = new DateTime($project['created_at']);
+    $node->created = $created_at->getTimestamp();
+    $updated_at = new DateTime($project['updated_at']);
+    $node->changed = $updated_at->getTimestamp();
+    $node->changed_project = $updated_at->getTimestamp();
   }
   node_save($node);
 
