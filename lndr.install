@@ -1,49 +1,51 @@
 <?php
+
 /**
  * @file
- * Code for the Lndr module
+ * Code for the Lndr module.
  */
 
 /**
  * Adding new content type and custom fields for Lndr
- * Migrate all existing lndr pages to nodes
+ * Migrate all existing lndr pages to nodes.
  */
 function lndr_update_7200(&$sandbox) {
-  // simply invoking lndr_install()
+  // Simply invoking lndr_install()
   lndr_install();
 
-  // We are migrating all existing url alias/path to the new content type we have created
+  // We are migrating all existing url alias/path to the new content type we have created.
   $aliases = _lndr_update_load_alias();
   if (!empty($aliases)) {
-   foreach ($aliases as $lndr_project_id => $alias) {
-     $node = new stdClass();
-     $node->title = $alias['alias'];
-     $node->type = LNDR_CT_TYPE;
-     node_object_prepare($node);
-     $node->language = LANGUAGE_NONE;
+    foreach ($aliases as $lndr_project_id => $alias) {
+      $node = new stdClass();
+      $node->title = $alias['alias'];
+      $node->type = LNDR_CT_TYPE;
+      node_object_prepare($node);
+      $node->language = LANGUAGE_NONE;
 
-     // anonymous user
-     $node->uid = 0;
-     $node->status = 1;
-     $node->promote = 0;
-     $node->path['alias'] = $alias['alias'];
+      // Anonymous user.
+      $node->uid = 0;
+      $node->status = 1;
+      $node->promote = 0;
+      $node->path['alias'] = $alias['alias'];
 
-     // if this was a published page, we also need to add the field association
-     if ($lndr_project_id != 'reserved') {
-       $node->lndr_project_id[LANGUAGE_NONE][0]['value'] = $lndr_project_id;
-     }
-     node_save($node);
+      // If this was a published page, we also need to add the field association.
+      if ($lndr_project_id != 'reserved') {
+        $node->lndr_project_id[LANGUAGE_NONE][0]['value'] = $lndr_project_id;
+      }
+      node_save($node);
 
-     // Lastly, let's remove the old aliases
-     $query = db_delete('url_alias');
-     $query->condition('pid', $alias['pid']);
-     $query->execute();
-   }
+      // Lastly, let's remove the old aliases.
+      $query = db_delete('url_alias');
+      $query->condition('pid', $alias['pid']);
+      $query->execute();
+    }
   }
 }
 
 /**
- * Look up of all path alias associated with Lndr
+ * Look up of all path alias associated with Lndr.
+ *
  * @return array
  */
 function _lndr_update_load_alias() {
@@ -54,19 +56,15 @@ function _lndr_update_load_alias() {
 
   $results = $query->execute();
   foreach ($results as $result) {
-    // extract the lndr project id
+    // Extract the lndr project id.
     $path = explode('/', $result->source);
-    // if (is_numeric($path[1])) {
-      $data[$path[1]] = (array) $result;
-    // }
+    $data[$path[1]] = (array) $result;
   }
   return $data;
 }
 
-
-
 /**
- * Implements hook_install
+ * Implements hook_install.
  */
 function lndr_install() {
   // Insert default pre-defined node types into the database. For a complete
@@ -92,12 +90,12 @@ function lndr_install() {
 }
 
 /**
- * Implements hook_uninstall
+ * Implements hook_uninstall.
  */
 function lndr_uninstall() {
-  // Remove the node type and all of associated nodes
+  // Remove the node type and all of associated nodes.
   $type = 'lndr_page';
-  // First, delete nodes
+  // First, delete nodes.
   $results = db_select('node', 'n')
     ->fields('n', array('nid'))
     ->condition('type', $type)
@@ -110,7 +108,7 @@ function lndr_uninstall() {
     lndr_delete_custom_fields();
     drupal_set_message(t('%count nodes has been deleted.', array('%count' => count($nids))));
   }
-  // Then, delete content type
+  // Then, delete content type.
   if (node_type_load($type)) {
     node_type_delete($type);
     variable_del('node_preview_' . $type);
@@ -119,7 +117,7 @@ function lndr_uninstall() {
   node_types_rebuild();
   menu_rebuild();
 
-  // Remove all of the variable set by this module
+  // Remove all of the variable set by this module.
   variable_del('lndr_token');
   variable_del('lndr_debug_mode');
   // @TODO We never used this variable.
@@ -127,6 +125,9 @@ function lndr_uninstall() {
   variable_del('lndr_delivery_mode');
 }
 
+/**
+ * Adding a custom fields.
+ */
 function lndr_add_custom_fields() {
   foreach (_lndr_installed_fields() as $field) {
     field_create_field($field);
@@ -138,6 +139,9 @@ function lndr_add_custom_fields() {
   }
 }
 
+/**
+ * Deleting a custom fields.
+ */
 function lndr_delete_custom_fields() {
   foreach (array_keys(_lndr_installed_fields()) as $field) {
     field_delete_field($field);
@@ -148,17 +152,23 @@ function lndr_delete_custom_fields() {
   }
 }
 
+/**
+ * Returns an array of field definition.
+ */
 function _lndr_installed_fields() {
   $t = get_t();
   return array(
     'lndr_project_id' => array(
       'field_name' => 'lndr_project_id',
       'label' => $t('Corresponding Lndr project (page) ID'),
-      'type' => 'text'
+      'type' => 'text',
     ),
   );
 }
 
+/**
+ * Returns an array of instance definitions.
+ */
 function _lndr_installed_instances() {
   $t = get_t();
   return array(
@@ -167,7 +177,7 @@ function _lndr_installed_instances() {
       'type' => 'text',
       'label' => $t('Corresponding Lndr project (page) ID'),
       'widget' => array(
-        'type' => 'text_textfield'
+        'type' => 'text_textfield',
       ),
     ),
   );
