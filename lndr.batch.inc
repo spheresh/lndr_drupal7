@@ -30,7 +30,7 @@ function lndr_sync_batch($nid) {
   module_load_include('inc', 'lndr');
   $alias = drupal_lookup_path('alias', "node/$nid", LANGUAGE_NONE);
   $project = lndr_find_project_by_url($alias);
-  if ($project["published"] == TRUE) {
+  if (isset($project["published"]) && $project["published"] == TRUE) {
     $resource_files = lndr_import_resources($project);
     foreach ($resource_files as $resource_file) {
       $operations[] = array(
@@ -42,6 +42,9 @@ function lndr_sync_batch($nid) {
         ),
       );
     }
+  }
+  elseif($project == FALSE) {
+    node_delete($nid);
   }
   $batch = array(
     'operations' => $operations,
