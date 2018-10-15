@@ -10,13 +10,6 @@
  */
 function lndr_admin_settings($form, &$form_state) {
   global $base_url;
-  $form['lndr_base_url'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Base URL'),
-    '#default_value' => variable_get('lndr_base_url', $base_url),
-    '#description' => t("Allows to override a base url setting."),
-    '#required' => TRUE,
-  );
 
   $form['lndr_token'] = array(
     '#type' => 'textfield',
@@ -48,6 +41,33 @@ function lndr_admin_settings($form, &$form_state) {
     ),
     '#after_build' => array('_lndr_option_descriptions'),
     '#default_value' => variable_get('lndr_delivery_mode', 'all_assets'),
+  );
+
+  $form['extra'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Extra settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+
+  $form['extra']['lndr_override_base_url'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Override Base URL'),
+    '#default_value' => variable_get('lndr_override_base_url', FALSE),
+    '#description' => t("Lndr module will use the default domain (!base) as the Base Url and in most cases this setting can be used by default.", array('!base' => $base_url)),
+  );
+
+  $form['extra']['lndr_base_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Base URL'),
+    '#default_value' => variable_get('lndr_base_url', $base_url),
+    '#description' => t('This option should be used if you cannot configure `base_url` in settings.php or server configuration is limited.'),
+    '#required' => TRUE,
+    '#states' => array(
+      'invisible' => array(
+        ':input[name="lndr_override_base_url"]' => array('checked' => FALSE),
+      ),
+    ),
   );
 
   return system_settings_form($form);

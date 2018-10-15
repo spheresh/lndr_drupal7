@@ -788,5 +788,5 @@ function lndr_node_delete($node) {
  */
 function lndr_get_base_url() {
   global $base_url;
-  return variable_get('lndr_base_url', $base_url);
+  return (variable_get('lndr_override_base_url', FALSE) == TRUE ? variable_get('lndr_base_url', $base_url) : $base_url);
 }
