@@ -661,6 +661,7 @@ function _lndr_service_base($check_path = TRUE) {
  * @return array|false
  */
 function lndr_import_resources($project, $force = FALSE) {
+  global $base_url;
   $directory = lndr_get_public_by_project($project);
   file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
 
@@ -702,7 +703,8 @@ function lndr_import_resources($project, $force = FALSE) {
         // If url is empty, just prepare path.
         $downlowd_url = $force ? $url : NULL;
         $resource_file = lndr_save_unmanaged_files($file_path_info['path'], $directory, $downlowd_url);
-        $element->setAttribute($source_attr, file_create_url($resource_file));
+        $resource_uri = str_replace($base_url, lndr_get_base_url(), file_create_url($resource_file));
+        $element->setAttribute($source_attr, $resource_uri);
         $resource_files[] = $resource_file;
       }
     }
