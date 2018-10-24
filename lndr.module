@@ -745,7 +745,7 @@ function lndr_save_unmanaged_files($path, $directory, $url = NULL, $last_modifie
     ));
     if ($response->code == 200) {
       $last_modified = $response->headers["last-modified"];
-      if (!file_exists($resource_file) || strtotime($last_modified) > filemtime($resource_file)) {
+      if (!file_exists($resource_file)/* || strtotime($last_modified) > filemtime($resource_file)*/) {
         $resource_data = file_get_contents($url . '/' . $path);
         if ($resource_data !== FALSE) {
           file_unmanaged_save_data($resource_data, $resource_file, FILE_EXISTS_REPLACE);
